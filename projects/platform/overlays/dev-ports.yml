@@ -1,0 +1,20 @@
+# Development host ports + JDWP for the platform tier.
+x-jvm-debug: &jvm-debug
+  JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+services:
+  config-server:
+    ports:
+      - "8888:8888"
+      - "5010:5005"
+    environment:
+      <<: *jvm-debug
+
+  discovery-server:
+    ports:
+      - "8761:8761"
+      - "5011:5005"
+    environment:
+      <<: *jvm-debug

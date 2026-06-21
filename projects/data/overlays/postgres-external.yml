@@ -1,0 +1,9 @@
+# Production-lite overlay: publish Postgres for controlled external access.
+#
+# Bind to 0.0.0.0 only when the VPS firewall allows 5432/tcp from specific
+# administrator IP addresses. Do not expose this port broadly.
+
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_HOST_BIND:-0.0.0.0}:5432:5432"

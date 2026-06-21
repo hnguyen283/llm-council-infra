@@ -1,0 +1,7 @@
+# Development host ports for the data tier.
+# Use only with dev.cmd / IDE workflows.
+services:
+  postgres:
+    ports: ["5432:5432"]
+  valkey:
+    ports: ["6379:6379"]

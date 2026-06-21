@@ -1,0 +1,5 @@
+# Development host port for the messaging tier.
+services:
+  kafka:
+    ports:
+      - "9092:9092"

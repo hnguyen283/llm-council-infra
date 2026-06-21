@@ -1,0 +1,64 @@
+# Development host ports + JDWP for the application tier.
+
+x-jvm-debug: &jvm-debug
+  JAVA_TOOL_OPTIONS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+services:
+
+  api-gateway:
+    ports:
+      - "8080:8080"
+      - "5009:5005"
+    environment:
+      <<: *jvm-debug
+
+  auth-service:
+    ports:
+      - "8084:8084"
+      - "5008:5005"
+    environment:
+      <<: *jvm-debug
+
+  account-service:
+    ports:
+      - "8087:8087"
+      - "5014:5005"
+    environment:
+      <<: *jvm-debug
+
+  orchestrator-service:
+    ports:
+      - "8081:8081"
+      - "5005:5005"
+    environment:
+      <<: *jvm-debug
+
+  gemini-service:
+    ports:
+      - "8082:8082"
+      - "5006:5005"
+    environment:
+      <<: *jvm-debug
+
+  gpt-service:
+    ports:
+      - "8083:8083"
+      - "5007:5005"
+    environment:
+      <<: *jvm-debug
+
+  prompt-service:
+    ports:
+      - "8085:8085"
+      - "5012:5005"
+    environment:
+      <<: *jvm-debug
+
+  local-ai-service:
+    ports:
+      - "8086:8086"
+      - "5013:5005"
+    environment:
+      <<: *jvm-debug

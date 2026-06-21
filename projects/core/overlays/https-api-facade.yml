@@ -1,0 +1,26 @@
+# Optional HTTPS API facade for direct browser/API access.
+#
+# This overlay keeps api-gateway on internal HTTP :8080 and adds a small
+# nginx TLS terminator on https://<host>:8443. It is intentionally separate
+# from prod.yml so production still publishes only api-gateway:8080 unless
+# operators explicitly layer this file in.
+
+services:
+
+  api-gateway-https:
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    networks: [llm-council-app]
+    depends_on:
+      api-gateway: { condition: service_healthy }
+    ports:
+      - "${HTTPS_FACADE_HOST_BIND:-127.0.0.1}:${HTTPS_FACADE_PORT:-8443}:8443"
+    volumes:
+      - ./edge/nginx-https.conf:/etc/nginx/nginx.conf:ro
+      - ${HTTPS_FACADE_CERT_DIR:-../../ssl}:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-check-certificate -qO- https://127.0.0.1:8443/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped

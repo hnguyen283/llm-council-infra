@@ -1,0 +1,13 @@
+# Production-lite laptop bridge.
+#
+# Kafka is not exposed publicly. This binds the broker host listener only to
+# VPS loopback so the laptop can reach it through an SSH local-forward:
+#   laptop 127.0.0.1:9092 -> VPS 127.0.0.1:9092 -> kafka container :9092
+#
+# The broker already advertises PLAINTEXT_HOST://localhost:9092, which is
+# exactly what the laptop Kafka client must see when the tunnel is active.
+
+services:
+  kafka:
+    ports:
+      - "127.0.0.1:9092:9092"

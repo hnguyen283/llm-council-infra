@@ -1,0 +1,76 @@
+name: llm-council-messaging
+
+# ============================================================================
+# Messaging tier — apache/kafka in KRaft mode (Zookeeper removed).
+#
+# Joins the `llm-council-messaging` external network. Spring services that
+# produce or consume on Kafka also join this network (see projects/core/).
+#
+# Backed by the official Apache Kafka image (Apache-2.0). KRaft replaces
+# Zookeeper for metadata management — the same process plays the broker
+# AND controller roles in this single-node deployment. See
+# reports/architecture-roadmap/2026-05-22/02/critical-dependency-replacement-plan.md.
+#
+# Three listeners:
+#   - PLAINTEXT://kafka:29092          internal callers over the messaging network
+#   - PLAINTEXT_HOST://localhost:9092  dev IDE callers (dev-ports overlay publishes 9092)
+#   - CONTROLLER://kafka:9093          KRaft controller quorum (single voter: this node)
+#
+# KRaft cluster metadata is auto-formatted on first startup by the Apache
+# image entrypoint, generating a random cluster ID. Treating broker metadata
+# as ephemeral is intentional — the project has no durable broker state
+# contract today, so a fresh KRaft cluster on each first-boot is the
+# documented behaviour (in-place ZK→KRaft migration is not supported, and
+# not needed here).
+# ============================================================================
+
+networks:
+  llm-council-messaging:
+    external: true
+
+services:
+
+  kafka:
+    image: apache/kafka:4.0.0@sha256:3f7b939115cd4872e9cee9369d80bd69712fde55f9902f46d793f64848dedc75
+    networks: [llm-council-messaging]
+    environment:
+      # KRaft node identity + roles (combined-mode: broker + controller).
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Listeners: internal + dev-host + controller.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Single-node defaults: RF=1, no replicas, instant rebalance for
+      # workers that come up alongside the broker in compose --wait order.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Auto-created topics start with 8 partitions to match what the
+      # orchestrator and worker services expect. Without this, a topic gets
+      # created with 1 partition on the first producer touch; consumers that
+      # subscribe before the orchestrator's KafkaAdmin increases the count
+      # cache a stale 1-partition view (metadata.max.age.ms = 5 min default)
+      # and any message produced after the increase that hashes to a new
+      # partition will sit unconsumed until the next rebalance — by which
+      # time the orchestrator's 120 s reply window has expired AND the
+      # rebalanced consumer's auto.offset.reset=latest seeks past it.
+      KAFKA_NUM_PARTITIONS: 8
+    healthcheck:
+      # Apache Kafka 4.x ships shell scripts as `*.sh` (the Confluent shell
+      # wrapper that omitted the suffix is gone). The broker is considered
+      # ready once the metadata topic list can be enumerated over the host
+      # listener — that proves both broker AND controller are up.
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s

@@ -1,0 +1,123 @@
+name: llm-council-observability
+
+# ============================================================================
+# Observability tier — zipkin, prometheus, victorialogs, alloy.
+#
+# Networks:
+#   - llm-council-observability  every observability service joins this.
+#   - llm-council-app            prometheus ALSO joins this so it can scrape
+#                                 the 8 Spring application services that live
+#                                 in projects/core/ (api-gateway, auth-service,
+#                                 account-service, orchestrator-service,
+#                                 gemini-service, gpt-service, prompt-service,
+#                                 local-ai-service).
+#
+# Log mount:
+#   Alloy tails ${LOG_DIR_HOST}/*.log. If LOG_DIR_HOST is unset the host path
+#   resolves to an empty string and the bind mount becomes "/var/log/services"
+#   in the container backed by /:/ — to keep this safe, callers must set
+#   LOG_DIR_HOST to an absolute host path (see .env.example). Alloy starts
+#   harmlessly when no log files are present.
+#
+# Volumes:
+#   victorialogs-data — VictoriaLogs storage (Apache-2.0). Replaces the
+#                       previous loki-data volume (P1.3).
+#
+# Migration history (P0 + P1, all dated 2026-05-22):
+#   - P0: messaging tier switched to apache/kafka:4.0.0 KRaft (cp-kafka +
+#     cp-zookeeper retired); data tier switched to Valkey 8.1 (Redis 7.4
+#     retired).
+#   - P1.1–P1.3: VictoriaLogs replaced Loki; loki-init / BusyBox retired
+#     (VictoriaLogs manages its own data dir); historical Loki chunks
+#     discarded per the approved decision (cite cutover date in
+#     llm-council-docs/docs/runbooks/error-events.md when querying older logs).
+#   - P1.7: Grafana service removed. Perses provisioning was deferred per
+#     the approved P1.6 fallback (02 §3.4); the admin UI Error Events
+#     table is the first-line operator surface. Metrics-dashboard parity
+#     deferred to P2/P3 as an app-native dashboard build.
+# ============================================================================
+
+networks:
+  llm-council-observability:
+    external: true
+  llm-council-app:
+    external: true
+
+volumes:
+  victorialogs-data:
+
+services:
+
+  zipkin:
+    image: openzipkin/zipkin:3@sha256:d17e856dcbba7ffeefbbfc252f89ab78a4ab6faed47e646d46daad78f91b5ee2
+    networks: [llm-council-observability]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9411/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  prometheus:
+    image: prom/prometheus:v2.54.1@sha256:f6639335d34a77d9d9db382b92eeb7fc00934be8eae81dbc03b31cfe90411a94
+    networks: [llm-council-observability, llm-council-app]
+    volumes:
+      - ../../infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
+
+  # VictoriaLogs (Apache-2.0) is the log aggregation backend. Alloy
+  # forwards via VictoriaLogs's Loki-compatible JSON push endpoint
+  # (/insert/loki/api/v1/push), so the existing label model (service,
+  # level, eventType, errorCode, category) carries over unchanged.
+  # Replaces Grafana Loki (P1.1–P1.3, 2026-05-22). Loki + loki-init +
+  # the BusyBox init helper have been retired.
+  #
+  # Internal-only by default (no published port). The local-observability
+  # overlay publishes 9428 on the host loopback for operator-side queries.
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.16.0-victorialogs@sha256:e34ddd06a7a6be277be3a7aa78a34dceae9abef730109d2cd04db8ef9971a2c8
+    restart: unless-stopped
+    networks: [llm-council-observability]
+    command:
+      - "-storageDataPath=/victorialogs-data"
+      - "-retentionPeriod=30d"
+      - "-httpListenAddr=:9428"
+    volumes:
+      - victorialogs-data:/victorialogs-data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9428/health >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  alloy:
+    image: grafana/alloy:v1.4.2@sha256:625174f60ee3287a4ec9de7e818805f117376f1375169bc73482b41540697376
+    networks: [llm-council-observability]
+    command: run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
+    volumes:
+      - ../../infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Read-only view of the shared log directory written by platform/core
+      # services when their log-files overlays are active. Alloy starts
+      # harmlessly when no files exist yet.
+      - ${LOG_DIR_HOST:-../../logs}:/var/log/services:ro
+    depends_on:
+      victorialogs: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/12345'"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 20s
+
+  # Grafana service removed 2026-05-22 (P1.7). AGPL-3.0 Critical exposure
+  # retired. Perses provisioning fallback invoked per the approved 02 §3.4
+  # contingency: app-native dashboard build is deferred to P2/P3. Operators
+  # use the admin UI Error Events table as the first-line observability
+  # surface; ad-hoc log queries land on the VictoriaLogs vmui via the
+  # gateway's /admin/observability/** route.

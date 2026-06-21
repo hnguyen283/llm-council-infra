@@ -1,0 +1,74 @@
+name: llm-council-data
+
+# ============================================================================
+# Data tier — postgres + valkey.
+#
+# Joins the `llm-council-data` external network. Spring services that need
+# either store also join this network (see projects/core/).
+#
+# Run from this directory or pass -f explicitly. The orchestrator scripts at
+# the repo root (prod.cmd, dev.cmd) pass --env-file pointing at the root .env.
+# ============================================================================
+
+networks:
+  llm-council-data:
+    external: true
+
+volumes:
+  pg-data:
+
+services:
+
+  # postgres is the system of record for identities (account-service) and the
+  # Standardized Prompt registry (prompt-service). Initdb scripts live under
+  # ../../infra/postgres/initdb on the host.
+  postgres:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/postgres-age:${IMAGE_TAG:-local}
+    build: { context: ../../infra/postgres, dockerfile: Dockerfile }
+    restart: unless-stopped
+    command: ["postgres", "-c", "shared_preload_libraries=age"]
+    networks: [llm-council-data]
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB:       ${POSTGRES_DB:-llm_council}
+      ACCOUNT_DB_USER:     ${ACCOUNT_DB_USER}
+      ACCOUNT_DB_PASSWORD: ${ACCOUNT_DB_PASSWORD}
+      PROMPT_DB_USER:      ${PROMPT_DB_USER:-prompt_app}
+      PROMPT_DB_PASSWORD:  ${PROMPT_DB_PASSWORD}
+      GRAPHRAG_DB_USER:     ${GRAPHRAG_DB_USER:-graphrag_app}
+      GRAPHRAG_DB_PASSWORD: ${GRAPHRAG_DB_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ../../infra/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-llm_council}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Ephemeral session / refresh-token state for auth-service; read on the hot
+  # path by api-gateway for sid validation.
+  #
+  # Backed by Valkey 8.x LTS (BSD-3-Clause, Linux Foundation fork of Redis
+  # 7.2.4 before the SSPL/RSALv2 relicensing). The Redis wire protocol is
+  # preserved so Spring Data Redis / Lettuce clients connect unchanged. The
+  # service was named `redis` in P0 for first-pass compatibility; the P2.4
+  # cleanup renamed it to `valkey` along with the `VALKEY_*` env vars and
+  # `valkey.*` Spring property keys (hard rename, no compatibility alias).
+  # See reports/architecture-roadmap/2026-05-22/02/critical-dependency-replacement-plan.md.
+  valkey:
+    image: valkey/valkey:8.1-alpine@sha256:77643d152547b446fc15cbafaff22004545663fcd40c6b28038ad283837baa75
+    restart: unless-stopped
+    networks: [llm-council-data]
+    command: ["valkey-server",
+              "--requirepass", "${VALKEY_PASSWORD}",
+              "--maxmemory", "256mb",
+              "--maxmemory-policy", "volatile-ttl"]
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli --no-auth-warning -a \"$$VALKEY_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

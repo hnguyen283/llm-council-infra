@@ -1,0 +1,6 @@
+# Overlay for VPS: separate operational database, no Graph-RAG extensions.
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: operational_db
+      DB_MODE: operational

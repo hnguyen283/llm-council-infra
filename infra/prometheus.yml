@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'spring-services'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - api-gateway:8080
+          - auth-service:8084
+          - orchestrator-service:8081
+          - gemini-service:8082
+          - gpt-service:8083
+          - account-service:8087
+          - prompt-service:8085
+          - local-ai-service:8086
+
+  - job_name: 'graphrag-services'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - graphrag-retrieval-service:9100
+          - graphrag-indexing-worker:9100

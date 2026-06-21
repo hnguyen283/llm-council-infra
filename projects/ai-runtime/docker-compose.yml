@@ -1,0 +1,51 @@
+name: llm-council-ai-runtime
+
+# ============================================================================
+# AI runtime tier — ollama.
+#
+# Joins the `llm-council-ai-runtime` external network. local-ai-service is the
+# only Spring service that needs Ollama; it joins this network in
+# projects/core/.
+#
+# GPU passthrough requires the NVIDIA Container Toolkit on the host. The
+# `deploy.resources.reservations.devices` block is the modern Compose form and
+# replaces the legacy `runtime: nvidia`; do not add both.
+#
+# First-run bootstrap (once per fresh ollama-data volume):
+#   docker compose exec ollama ollama pull deepseek-r1:7b
+#   docker compose exec ollama ollama create planner -f /Modelfile.planner
+# dev-ai.cmd at the repo root automates both steps.
+# ============================================================================
+
+networks:
+  llm-council-ai-runtime:
+    external: true
+
+volumes:
+  ollama-data:
+
+services:
+  ollama:
+    image: ollama/ollama:0.5.7@sha256:7e672211886f8bd4448a98ed577e26c816b9e8b052112860564afaa2c105800e
+    networks: [llm-council-ai-runtime]
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_MAX_LOADED_MODELS: 1
+      OLLAMA_NUM_PARALLEL: 1
+    volumes:
+      - ollama-data:/root/.ollama
+      - ../../infra/spike/ollama/Modelfile.planner:/Modelfile.planner:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s

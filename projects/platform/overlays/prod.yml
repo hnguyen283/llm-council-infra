@@ -1,0 +1,19 @@
+# Production overlay for the platform tier.
+# Base does not publish ports, so there is nothing to reset.
+
+x-jvm-prod: &jvm-prod
+  JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+services:
+  config-server:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      CONFIG_REPO_PATH: file:/config-repo
+
+  discovery-server:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod

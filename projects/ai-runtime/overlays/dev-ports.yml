@@ -1,0 +1,5 @@
+# Development host port for the AI runtime tier.
+services:
+  ollama:
+    ports:
+      - "11434:11434"

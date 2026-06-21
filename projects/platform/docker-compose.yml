@@ -1,0 +1,56 @@
+name: llm-council-platform
+
+# ============================================================================
+# Platform tier — config-server + discovery-server.
+#
+# Joins the `llm-council-platform` external network. Every Spring service in
+# projects/core/ joins this network too so they can resolve
+#   http://config-server:8888           (Spring Cloud Config)
+#   http://discovery-server:8761/eureka (Eureka)
+#
+# Both services have explicit image tags. The `build:` block is preserved so
+# `docker compose build <service>` still works from this directory; the
+# `image:` line names the resulting tag so the image can be built once and
+# pulled/inspected independently.
+# ============================================================================
+
+networks:
+  llm-council-platform:
+    external: true
+
+x-jvm-common: &jvm-common
+  JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+services:
+
+  config-server:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/config-server:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/config-server, dockerfile: Dockerfile }
+    networks: [llm-council-platform]
+    environment:
+      <<: *jvm-common
+      CONFIG_REPO_PATH: file:/config-repo
+    volumes:
+      - ../../../llm-council/config-repo:/config-repo:ro
+    healthcheck:
+      test: ["CMD","wget","-qO-","http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  discovery-server:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/discovery-server:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/discovery-server, dockerfile: Dockerfile }
+    networks: [llm-council-platform]
+    environment:
+      <<: *jvm-common
+    depends_on:
+      config-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s

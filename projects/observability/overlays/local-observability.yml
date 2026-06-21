@@ -1,0 +1,42 @@
+# ============================================================================
+# Local-operator observability overlay.
+#
+# Layer on top of prod.yml when the operator wants direct browser access to
+# Prometheus, Zipkin, and VictoriaLogs from the host. Publishes those three
+# ports to ${OBSERVABILITY_HOST_BIND:-127.0.0.1} only (loopback by default).
+#
+# Wrapped by prod-local-obs.cmd at the repo root.
+#
+# Security invariants (asserted by projects/scripts/validate-compose.ps1):
+#   - Only Prometheus/Zipkin/VictoriaLogs are published, and only to loopback.
+#   - Postgres, Valkey, Kafka, Ollama, Spring HTTP ports, JDWP, and the
+#     observability internals (alloy admin port) remain unpublished.
+#
+# Grafana block removed 2026-05-22 (P1.7) — Grafana service deleted from base.
+# ============================================================================
+
+services:
+
+  prometheus:
+    ports:
+      - host_ip: "${OBSERVABILITY_HOST_BIND:-127.0.0.1}"
+        target: 9090
+        published: "9090"
+        protocol: tcp
+        mode: host
+
+  zipkin:
+    ports:
+      - host_ip: "${OBSERVABILITY_HOST_BIND:-127.0.0.1}"
+        target: 9411
+        published: "9411"
+        protocol: tcp
+        mode: host
+
+  victorialogs:
+    ports:
+      - host_ip: "${OBSERVABILITY_HOST_BIND:-127.0.0.1}"
+        target: 9428
+        published: "9428"
+        protocol: tcp
+        mode: host

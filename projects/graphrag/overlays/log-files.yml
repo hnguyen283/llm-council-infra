@@ -1,0 +1,19 @@
+# Optional file-logging overlay for the Graph-RAG tier.
+#
+# Mounts the shared host log directory into each Graph-RAG container. The
+# Python entrypoint writes file logs when LOG_DIR is set.
+
+services:
+  graphrag-retrieval-service:
+    environment:
+      LOG_DIR: /app/logs
+      LOG_FILE_NAME: graphrag-retrieval-service.log
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/graphrag:/app/logs
+
+  graphrag-indexing-worker:
+    environment:
+      LOG_DIR: /app/logs
+      LOG_FILE_NAME: graphrag-indexing-worker.log
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/graphrag:/app/logs

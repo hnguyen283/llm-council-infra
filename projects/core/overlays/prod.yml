@@ -1,0 +1,65 @@
+# Production overlay for the application tier.
+#
+# Base does not publish ports. This overlay:
+#   - Publishes api-gateway:8080 (the only production public edge).
+#   - Pins SPRING_PROFILES_ACTIVE on account-service to include `prod` so its
+#     /internal/** filter is active.
+#   - Enforces AUTH_COOKIE_SECURE=true on auth-service.
+#   - Adds restart policies.
+#   - Strips the JDWP agent from JAVA_TOOL_OPTIONS (base already has no JDWP,
+#     but the inherited dev-ports.yml could leak it in misuse — this overlay
+#     re-asserts the prod JVM env).
+
+x-jvm-prod: &jvm-prod
+  JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+services:
+
+  api-gateway:
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://welllifeapp.com,https://www.welllifeapp.com}
+
+  auth-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      AUTH_CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://welllifeapp.com,https://www.welllifeapp.com}
+      AUTH_COOKIE_SECURE: "true"
+
+  account-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      SPRING_PROFILES_ACTIVE: docker,prod
+      ACCOUNT_INTERNAL_AUTH_ENABLED: "true"
+
+  orchestrator-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+
+  gemini-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+
+  gpt-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+
+  prompt-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+
+  local-ai-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod

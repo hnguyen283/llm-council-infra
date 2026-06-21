@@ -1,0 +1,55 @@
+# Optional file-logging overlay for the application tier.
+#
+# Writes <service-name>.log under ${LOG_DIR_HOST} for every Spring service.
+# Required so projects/observability's Alloy container can ship these into
+# VictoriaLogs (Alloy mounts the same ${LOG_DIR_HOST} read-only).
+
+services:
+
+  api-gateway:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs
+
+  auth-service:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs
+
+  account-service:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs
+
+  orchestrator-service:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs
+
+  gemini-service:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs
+
+  gpt-service:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs
+
+  prompt-service:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs
+
+  local-ai-service:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/core:/app/logs

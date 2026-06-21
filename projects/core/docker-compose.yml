@@ -1,0 +1,249 @@
+name: llm-council-core
+
+# ============================================================================
+# Core application tier — 8 Spring services.
+#
+# Networks joined per service:
+#   data           — anyone touching postgres or valkey
+#   messaging      — anyone producing or consuming on Kafka
+#   observability  — every service (prometheus scrapes them, services send
+#                     Zipkin traces over HTTP)
+#   platform       — every service (Spring Cloud Config + Eureka)
+#   app            — every service (gateway/internal-token paths,
+#                     service-to-service /internal/** calls)
+#   ai-runtime     — local-ai-service only (talks to ollama)
+#
+# Cross-project depends_on is NOT supported by Compose. The orchestrator
+# scripts at the repo root (prod.cmd, prod-local-obs.cmd) gate cross-project
+# ordering by polling health endpoints between project boots. Within this
+# project, depends_on with health conditions still works.
+#
+# Image tags are preserved so individual service images can be built, pushed,
+# pulled, and inspected without changing service names. Build contexts point
+# back to the per-module directories at the repo root.
+# ============================================================================
+
+networks:
+  llm-council-data:          { external: true }
+  llm-council-messaging:     { external: true }
+  llm-council-observability: { external: true }
+  llm-council-platform:      { external: true }
+  llm-council-app:           { external: true }
+  llm-council-ai-runtime:    { external: true }
+
+x-jvm-common: &jvm-common
+  # UTF-8 enforcement. JDK 21 defaults file.encoding to UTF-8 (JEP 400), but
+  # sun.jnu.encoding and stdout.encoding still follow the host locale. Pin
+  # all three to keep Vietnamese log lines readable in `docker compose logs`
+  # regardless of the host LANG.
+  JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+services:
+
+  api-gateway:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/api-gateway:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/api-gateway, dockerfile: Dockerfile }
+    networks: [llm-council-data, llm-council-observability, llm-council-platform, llm-council-app]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      VALKEY_HOST:       valkey
+      VALKEY_PORT:       "6379"
+      VALKEY_PASSWORD:   ${VALKEY_PASSWORD}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:4201,http://localhost:8080}
+      AUTH_JWKS_URI:     http://auth-service:8084/.well-known/jwks.json
+      AUTH_JWT_ISSUER:   ${AUTH_JWT_ISSUER:-https://auth.llm-council.local/}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-llm-council-ui}
+      # Renamed 2026-05-22 (P1.7/P1.8). Previously ADMIN_GRAFANA_BASE_URL
+      # and ADMIN_OBS_UI_GRAFANA / ADMIN_OBS_UI_LOKI; Grafana and Loki are
+      # gone. Dashboard link defaults empty because the Perses fallback
+      # (02 §3.4) deferred the metrics-dashboard build to P2/P3; logs link
+      # points at VictoriaLogs vmui when local-observability is active.
+      ADMIN_DASHBOARD_BASE_URL:  ${ADMIN_DASHBOARD_BASE_URL:-/admin/observability}
+      ADMIN_OBS_UI_DASHBOARD:    ${ADMIN_OBS_UI_DASHBOARD:-}
+      ADMIN_OBS_UI_PROMETHEUS:   ${ADMIN_OBS_UI_PROMETHEUS:-}
+      ADMIN_OBS_UI_ZIPKIN:       ${ADMIN_OBS_UI_ZIPKIN:-}
+      ADMIN_OBS_UI_LOGS:         ${ADMIN_OBS_UI_LOGS:-}
+      GATEWAY_INTERNAL_KID:             ${GATEWAY_INTERNAL_KID}
+      GATEWAY_INTERNAL_ISSUER:          ${GATEWAY_INTERNAL_ISSUER:-internal:api-gateway}
+      GATEWAY_INTERNAL_AUDIENCE:        ${GATEWAY_INTERNAL_AUDIENCE:-internal}
+      GATEWAY_INTERNAL_TTL_SECONDS:     ${GATEWAY_INTERNAL_TTL_SECONDS:-300}
+      GATEWAY_INTERNAL_PRIVATE_KEY_PEM: ${GATEWAY_INTERNAL_PRIVATE_KEY_PEM}
+      GATEWAY_INTERNAL_PUBLIC_KEYS_PEM: ${GATEWAY_INTERNAL_PUBLIC_KEYS_PEM}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    depends_on:
+      auth-service: { condition: service_started }
+
+  auth-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/auth-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/auth-service, dockerfile: Dockerfile }
+    networks: [llm-council-data, llm-council-observability, llm-council-platform, llm-council-app]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      VALKEY_HOST:       valkey
+      VALKEY_PORT:       "6379"
+      VALKEY_PASSWORD:   ${VALKEY_PASSWORD}
+      AUTH_CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:4201,http://localhost:8080}
+      AUTH_JWT_SIGNING_KID:     ${AUTH_JWT_SIGNING_KID}
+      AUTH_JWT_PRIVATE_KEY_PEM: ${AUTH_JWT_PRIVATE_KEY_PEM}
+      AUTH_JWT_PUBLIC_KEYS_PEM: ${AUTH_JWT_PUBLIC_KEYS_PEM}
+      AUTH_JWT_ISSUER:          ${AUTH_JWT_ISSUER:-https://auth.llm-council.local/}
+      AUTH_JWT_AUDIENCE:        ${AUTH_JWT_AUDIENCE:-llm-council-ui}
+      AUTH_COOKIE_SECURE:        ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAME_SITE:     ${AUTH_COOKIE_SAME_SITE:-Strict}
+      AUTH_COOKIE_PATH:          ${AUTH_COOKIE_PATH:-/auth}
+      AUTH_COOKIE_DOMAIN:        ${AUTH_COOKIE_DOMAIN:-}
+      AUTH_DEVICE_HASH_SALT:     ${AUTH_DEVICE_HASH_SALT:-}
+      ACCOUNT_SERVICE_URL:      http://account-service:8087
+      ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
+      AUTH_GOOGLE_CLIENT_ID:          ${AUTH_GOOGLE_CLIENT_ID:-}
+      AUTH_GOOGLE_ALLOWED_DOMAINS:    ${AUTH_GOOGLE_ALLOWED_DOMAINS:-}
+      AUTH_GOOGLE_SIGNUP_SECRET:      ${AUTH_GOOGLE_SIGNUP_SECRET}
+    depends_on:
+      account-service: { condition: service_started }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  account-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/account-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/account-service, dockerfile: Dockerfile }
+    networks: [llm-council-data, llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      DB_URL:      jdbc:postgresql://postgres:5432/${POSTGRES_DB:-llm_council}
+      DB_USER:     ${ACCOUNT_DB_USER}
+      DB_PASSWORD: ${ACCOUNT_DB_PASSWORD}
+      ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
+      ACCOUNT_INTERNAL_AUTH_ENABLED:  ${ACCOUNT_INTERNAL_AUTH_ENABLED:-false}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8087/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  orchestrator-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/orchestrator-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/orchestrator-service, dockerfile: Dockerfile }
+    networks: [llm-council-data, llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
+      GATEWAY_INTERNAL_JWKS_URI: http://api-gateway:8080/.well-known/internal-jwks.json
+      GATEWAY_INTERNAL_ISSUER:   ${GATEWAY_INTERNAL_ISSUER:-internal:api-gateway}
+      GATEWAY_INTERNAL_AUDIENCE: ${GATEWAY_INTERNAL_AUDIENCE:-internal}
+      VALKEY_HOST:       valkey
+      VALKEY_PORT:       "6379"
+      VALKEY_PASSWORD:   ${VALKEY_PASSWORD}
+      STANDARDIZED_PROMPT_ENABLED:           ${STANDARDIZED_PROMPT_ENABLED:-false}
+      STANDARDIZED_PROMPT_SHADOW_ENABLED:    ${STANDARDIZED_PROMPT_SHADOW_ENABLED:-false}
+      STANDARDIZED_PROMPT_FAIL_CLOSED:       ${STANDARDIZED_PROMPT_FAIL_CLOSED:-false}
+      STANDARDIZED_PROMPT_CAPTURE_ARTIFACTS: ${STANDARDIZED_PROMPT_CAPTURE_ARTIFACTS:-false}
+      STANDARDIZED_PROMPT_AUGMENTATION_ENABLED: ${STANDARDIZED_PROMPT_AUGMENTATION_ENABLED:-false}
+      PLAN_BY_AI_ENABLED:                    ${PLAN_BY_AI_ENABLED:-false}
+      PLAN_BY_AI_SHADOW_ENABLED:             ${PLAN_BY_AI_SHADOW_ENABLED:-true}
+      GRAPHRAG_ENABLED:                      ${GRAPHRAG_ENABLED:-false}
+      GRAPHRAG_TARGET:                       ${GRAPHRAG_TARGET:-graphrag-retrieval-service:50051}
+      GRAPHRAG_DEADLINE_MS:                  ${GRAPHRAG_DEADLINE_MS:-5000}
+      GRAPHRAG_MOCK_ENABLED:                 ${GRAPHRAG_MOCK_ENABLED:-false}
+      QUICK_ANSWER_A1_PROVIDER_ORDER:        ${QUICK_ANSWER_A1_PROVIDER_ORDER:-local,openai-mini,gemini-flash-lite}
+      QUICK_ANSWER_A1_TIMEOUT_MS:            ${QUICK_ANSWER_A1_TIMEOUT_MS:-4000}
+      QUICK_ANSWER_A1_FAIL_OPEN:             ${QUICK_ANSWER_A1_FAIL_OPEN:-true}
+    depends_on:
+      api-gateway: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  gemini-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/gemini-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/gemini-service, dockerfile: Dockerfile }
+    networks: [llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  gpt-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/gpt-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/gpt-service, dockerfile: Dockerfile }
+    networks: [llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  prompt-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/prompt-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/prompt-service, dockerfile: Dockerfile }
+    networks: [llm-council-data, llm-council-observability, llm-council-platform, llm-council-app]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      GATEWAY_INTERNAL_JWKS_URI: http://api-gateway:8080/.well-known/internal-jwks.json
+      GATEWAY_INTERNAL_ISSUER:   ${GATEWAY_INTERNAL_ISSUER:-internal:api-gateway}
+      GATEWAY_INTERNAL_AUDIENCE: ${GATEWAY_INTERNAL_AUDIENCE:-internal}
+      DB_URL:      jdbc:postgresql://postgres:5432/${POSTGRES_DB:-llm_council}
+      DB_USER:     ${PROMPT_DB_USER:-prompt_app}
+      DB_PASSWORD: ${PROMPT_DB_PASSWORD}
+    depends_on:
+      api-gateway: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  local-ai-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/local-ai-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/local-ai-service, dockerfile: Dockerfile }
+    networks: [llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app, llm-council-ai-runtime]
+    environment:
+      <<: *jvm-common
+      SPRING_PROFILES_ACTIVE: docker
+      CONFIG_SERVER_URI: http://config-server:8888
+      OLLAMA_BASE_URL: http://ollama:11434
+      LOCAL_AI_MODEL: ${LOCAL_AI_MODEL:-planner}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s

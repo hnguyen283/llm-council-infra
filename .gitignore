@@ -1,0 +1,19 @@
+# Secrets
+.env
+.env.*
+.env.local
+prod-lite.env
+
+# Local TLS material
+ssl/
+*.pem
+*.key
+*.p12
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,68 @@
+name: llm-council-graphrag
+
+# ============================================================================
+# Graph-RAG tier — Python gRPC retrieval service + indexing workers.
+#
+# Joins llm-council-data (Postgres) and llm-council-messaging (Kafka).
+# The orchestrator-service connects via gRPC on the llm-council-app network.
+# ============================================================================
+
+networks:
+  llm-council-data:          { external: true }
+  llm-council-messaging:     { external: true }
+  llm-council-app:           { external: true }
+  llm-council-observability: { external: true }
+  llm-council-ai-runtime:    { external: true }
+
+services:
+
+  graphrag-retrieval-service:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/graphrag-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/graphrag-service, dockerfile: Dockerfile }
+    networks: [llm-council-data, llm-council-app, llm-council-observability, llm-council-ai-runtime]
+    environment:
+      RUN_MODE:    RETRIEVER
+      GRPC_PORT: "50051"
+      METRICS_PORT: "9100"
+      DB_HOST:     postgres
+      DB_PORT:     "5432"
+      DB_NAME:     ${POSTGRES_DB:-llm_council}
+      DB_USER:     ${GRAPHRAG_DB_USER:-graphrag_app}
+      DB_PASSWORD: ${GRAPHRAG_DB_PASSWORD}
+      DB_SCHEMA:   graphrag
+      AGE_GRAPH_NAME: research_graph
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      REDIS_PASSWORD: ${VALKEY_PASSWORD}
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  graphrag-indexing-worker:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/graphrag-service:${IMAGE_TAG:-local}
+    build: { context: ../../../llm-council/graphrag-service, dockerfile: Dockerfile }
+    networks: [llm-council-data, llm-council-messaging, llm-council-observability, llm-council-ai-runtime]
+    environment:
+      RUN_MODE:    INDEXER
+      METRICS_PORT: "9100"
+      DB_HOST:     postgres
+      DB_PORT:     "5432"
+      DB_NAME:     ${POSTGRES_DB:-llm_council}
+      DB_USER:     ${GRAPHRAG_DB_USER:-graphrag_app}
+      DB_PASSWORD: ${GRAPHRAG_DB_PASSWORD}
+      DB_SCHEMA:   graphrag
+      AGE_GRAPH_NAME: research_graph
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CONSUMER_GROUP:    graphrag-indexing
+      KAFKA_EVIDENCE_TOPIC:    research.evidence.collected
+      REDIS_PASSWORD: ${VALKEY_PASSWORD}
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f \"python -m src.server\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s

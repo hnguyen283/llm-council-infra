@@ -1,0 +1,19 @@
+# Experimental hybrid production overlay.
+#
+# Runs the public control plane and cloud API workers on the VPS while keeping
+# laptop-local Ollama behind the remote local-ai-service worker.
+#
+# Use with projects/core/docker-compose.yml + overlays/prod.yml.
+
+services:
+
+  orchestrator-service:
+    environment:
+      ORCHESTRATOR_CONCURRENCY_MAX_JOBS: ${ORCHESTRATOR_CONCURRENCY_MAX_JOBS:-25}
+      PLAN_BY_AI_ENABLED: ${PLAN_BY_AI_ENABLED:-true}
+
+  local-ai-service:
+    # Not started by the VPS production-lite run. The laptop starts this
+    # service separately with SPRING_PROFILES_ACTIVE=remote-worker and connects
+    # outward over the private network.
+    profiles: ["laptop-local-ai"]

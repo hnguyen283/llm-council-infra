@@ -1,0 +1,91 @@
+// Grafana Alloy configuration for LLM Council.
+//
+// Tails service log files from the shared log directory and forwards
+// entries to VictoriaLogs (Apache-2.0) via its Loki-compatible JSON
+// ingestion endpoint with low-cardinality labels (service, level,
+// eventType, errorCode, category).
+//
+// Active only when the log-files overlay injects LOG_DIR=/app/logs into
+// every Spring container AND this Alloy container mounts the same directory
+// read-only at /var/log/services.
+//
+// Note: this file still uses Alloy's `loki.write` component. The component
+// name is preserved because VictoriaLogs accepts the Loki JSON push
+// protocol at /insert/loki/api/v1/push without a collector rewrite —
+// Alloy thinks it's pushing to Loki, but the data lands in VictoriaLogs.
+// All extracted labels become VictoriaLogs stream fields by default.
+
+// ── File discovery ────────────────────────────────────────────────────────
+local.file_match "service_logs" {
+  // Tail all current service log files. AI trace and partner files share
+  // the same directory and are included automatically.
+  path_targets = [{
+    "__path__" = "/var/log/services/*.log",
+    "job"      = "spring-services",
+  }]
+  sync_period = "5s"
+}
+
+// ── Read and forward ──────────────────────────────────────────────────────
+loki.source.file "service_logs" {
+  targets    = local.file_match.service_logs.targets
+  forward_to = [loki.process.enrich.receiver]
+}
+
+// ── Label extraction ──────────────────────────────────────────────────────
+loki.process "enrich" {
+  forward_to = [loki.write.default.receiver]
+
+  // Extract service name from filename.
+  // e.g. /var/log/services/orchestrator-service.log → service=orchestrator-service
+  stage.regex {
+    source     = "filename"
+    expression = `/var/log/services/(?P<service>[^/]+)\.log$`
+  }
+  stage.labels {
+    values = { service = "service" }
+  }
+
+  // Extract log level from the service file pattern:
+  // "yyyy-MM-dd HH:mm:ss.SSS | LEVEL | logger | cid=... | message"
+  // The optional "cid=..." segment was added in the correlation
+  // propagation change but does not change the level position.
+  stage.regex {
+    expression = `^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \| *(?P<level>\w+) *\|`
+  }
+  stage.labels {
+    values = { level = "level" }
+  }
+
+  // Normalized ERROR_EVENT extraction.
+  //
+  // The com.aio.errorevent logger emits one single-line JSON blob per
+  // handled failure (see ../llm-council-docs/docs/contracts/error-event.md). Only three
+  // fields are promoted to Loki labels — they are all low-cardinality
+  // enums or stable code identifiers. correlationId, jobId, route,
+  // user/session hashes, and message stay in the log payload so they
+  // do NOT explode Loki's stream cardinality.
+  stage.regex {
+    expression = `"eventType":"(?P<eventType>ERROR_EVENT)"`
+  }
+  stage.regex {
+    expression = `"errorCode":"(?P<errorCode>[A-Z0-9_]{1,40})"`
+  }
+  stage.regex {
+    expression = `"category":"(?P<category>[a-z]{1,32})"`
+  }
+  stage.labels {
+    values = {
+      eventType = "eventType",
+      errorCode = "errorCode",
+      category  = "category",
+    }
+  }
+}
+
+// ── VictoriaLogs sink (Loki-compatible JSON push) ─────────────────────────
+loki.write "default" {
+  endpoint {
+    url = "http://victorialogs:9428/insert/loki/api/v1/push"
+  }
+}

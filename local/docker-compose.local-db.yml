@@ -1,0 +1,33 @@
+name: llm-council-local-db
+
+networks:
+  llm-council-data:
+    external: true
+
+volumes:
+  pg-local-knowledge:
+
+services:
+  postgres-knowledge:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/postgres-age:${IMAGE_TAG:-local}
+    build: { context: ../infra/postgres, dockerfile: Dockerfile }
+    restart: unless-stopped
+    command: ["postgres", "-c", "shared_preload_libraries=age"]
+    networks: [llm-council-data]
+    ports:
+      - "${LOCAL_PG_HOST_BIND:-127.0.0.1}:5433:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-llm_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_admin_pw_change_me}
+      POSTGRES_DB: knowledge_db
+      DB_MODE: knowledge
+      GRAPHRAG_DB_USER: ${GRAPHRAG_DB_USER:-graphrag_app}
+      GRAPHRAG_DB_PASSWORD: ${GRAPHRAG_DB_PASSWORD:-local_graphrag_pw_change_me}
+    volumes:
+      - pg-local-knowledge:/var/lib/postgresql/data
+      - ../infra/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-llm_admin} -d knowledge_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

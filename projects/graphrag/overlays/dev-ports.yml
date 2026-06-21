@@ -1,0 +1,5 @@
+# Dev overlay: expose gRPC port to the host for local testing
+services:
+  graphrag-retrieval-service:
+    ports:
+      - "50051:50051"

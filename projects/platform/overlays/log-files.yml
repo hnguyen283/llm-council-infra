@@ -1,0 +1,18 @@
+# Optional file-logging overlay for the platform tier.
+#
+# Writes config-server.log and discovery-server.log under ${LOG_DIR_HOST}.
+# Required so projects/observability's Alloy container (which reads the
+# same host path read-only) can ship these into VictoriaLogs.
+
+services:
+  config-server:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/platform:/app/logs
+
+  discovery-server:
+    environment:
+      LOG_DIR: /app/logs
+    volumes:
+      - ${LOG_DIR_HOST:-../../logs}/platform:/app/logs
