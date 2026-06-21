@@ -27,6 +27,16 @@ set -euo pipefail
 DB_MODE="${DB_MODE:-full}"  # full | operational | knowledge
 echo "[initdb] Running in DB_MODE: $DB_MODE"
 
+# Ensure the target database exists (useful when DB name is changed on an existing cluster)
+if [[ "${POSTGRES_DB:-}" != "postgres" ]]; then
+    echo "[initdb] Ensuring database $POSTGRES_DB exists..."
+    DB_EXISTS=$(psql -tAc "SELECT 1 FROM pg_database WHERE datname='$POSTGRES_DB';" --username "$POSTGRES_USER" --dbname "postgres" 2>/dev/null || echo "0")
+    if [[ "$DB_EXISTS" != "1" ]]; then
+        echo "[initdb] Database $POSTGRES_DB does not exist. Creating..."
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "postgres" -c "CREATE DATABASE $POSTGRES_DB;"
+    fi
+fi
+
 if [[ "$DB_MODE" == "full" || "$DB_MODE" == "operational" ]]; then
     # pgcrypto is required by both schemas (gen_random_uuid()). Create it
     # once up-front under the superuser so neither application role needs

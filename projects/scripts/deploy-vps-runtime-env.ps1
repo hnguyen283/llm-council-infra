@@ -399,6 +399,7 @@ New-Item -ItemType Directory -Force -Path $staging | Out-Null
 
 Copy-InfraPath "projects\data\docker-compose.yml" $staging
 Copy-InfraPath "projects\data\overlays\postgres-external.yml" $staging
+Copy-InfraPath "projects\data\overlays\vps-operational.yml" $staging
 Copy-InfraPath "projects\messaging\docker-compose.yml" $staging
 Copy-InfraPath "projects\messaging\overlays\prod-laptop-tunnel.yml" $staging
 Copy-InfraPath "projects\platform\docker-compose.yml" $staging
