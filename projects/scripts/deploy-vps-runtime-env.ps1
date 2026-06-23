@@ -28,7 +28,13 @@ if (-not $HostInfoPath) {
     $HostInfoPath = Join-Path $ProjectRoot "hostInfo.txt"
 }
 if (-not $EnvPath) {
-    $EnvPath = Join-Path $InfraRoot "prod-lite.env"
+    # Default fallback: check if we have option 4 env file, else use root.
+    $opt4Env = Join-Path $InfraRoot "start\4-prod-lite-vps\.env"
+    if (Test-Path -LiteralPath $opt4Env) {
+        $EnvPath = $opt4Env
+    } else {
+        $EnvPath = Join-Path $InfraRoot "prod-lite.env"
+    }
 }
 $UiRoot = Join-Path $ProjectRoot "llm-council-ui"
 $AdminUiRoot = Join-Path $ProjectRoot "llm-council-admin-ui"
@@ -95,7 +101,7 @@ function Require-Env([hashtable] $EnvValues, [string[]] $Keys) {
         }
     }
     if ($missing.Count -gt 0) {
-        throw "Missing required prod-lite.env value(s): $($missing -join ', ')"
+        throw "Missing required environment value(s): $($missing -join ', ')"
     }
 }
 
@@ -298,7 +304,7 @@ function Copy-RemoteFile([string] $LocalPath, [string] $SshTarget, [int] $SshPor
     }
 }
 
-Write-Step "Reading hostInfo.txt and llm-council\prod-lite.env"
+Write-Step "Reading hostInfo.txt and environment config"
 $hostInfo = Read-KeyValueFile $HostInfoPath
 $envValues = Read-DotEnv $EnvPath
 
@@ -411,7 +417,7 @@ Copy-InfraPath "projects\core\overlays\prod-lite.yml" $staging
 Copy-InfraPath "projects\core\overlays\log-files.yml" $staging
 Copy-InfraPath "projects\graphrag\docker-compose.yml" $staging
 Copy-InfraPath "projects\graphrag\overlays\log-files.yml" $staging
-Copy-InfraPath "prod-lite.sh" $staging
+Copy-Item -LiteralPath (Join-Path $InfraRoot "start\4-prod-lite-vps\prod-lite.sh") -Destination (Join-Path $staging "prod-lite.sh") -Force
 Copy-RelativePath "config-repo" $staging
 Copy-InfraPath "infra\postgres\Dockerfile" $staging
 Copy-InfraPath "infra\postgres\initdb" $staging

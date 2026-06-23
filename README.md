@@ -38,58 +38,42 @@ To safeguard knowledge graph data and optimize costs, the database layer is spli
 
 ---
 
-## Environment Setup
+## Startup & Deployment Options
 
-1.  **Local Stack Secrets**: Copy [`.env.example`](.env.example) to `.env` in this directory:
-    ```bash
-    cp .env.example .env
-    # Customize JWT keys, passwords, and API keys.
-    ```
-2.  **VPS Hybrid Secrets**: Customize `prod-lite.env` in this directory. This file remains on your laptop and is never copied to the VPS; its values are injected over SSH during deployment.
-3.  **Local SSL**: Place certificates under `ssl/` inside this directory (gitignored).
+All entry points and configurations are structured under the [`start/`](start/) directory to isolate runtime contexts. Each subdirectory contains its own `.env` file template for local customization.
 
----
+Navigate into one of the following directories under `start/` to run or deploy the stack:
 
-## Orchestrator Scripts
+### [1. Local Development](start/1-dev-local/)
+Used to run dependencies (Postgres, Valkey, Kafka, Zipkin, etc.) locally in Docker so you can run the Java services and UI from your IDE.
+*   `dev.cmd` — Starts backend infrastructure.
+*   `dev-ai.cmd` — Starts Ollama and pulls the DeepSeek model.
 
-All commands should be run from this repository root:
+### [2. Local Staging](start/2-staging-local/)
+Runs the full production topology locally on your laptop with loopback observability tools enabled.
+*   `prod-overlays.cmd` — Launches the production stack with Prometheus, Zipkin, and VictoriaLogs.
 
-### 1. Local Development (`dev.cmd` & `dev-ai.cmd`)
-Starts core infrastructure services (`postgres`, `valkey`, `kafka`, `zipkin`, `discovery-server`) and leaves your terminal free. Developers run `config-server` and application services directly from their IDE (using `llm-council` backend codebase).
-*   `dev.cmd` — Brings up dev infrastructure.
-*   `dev-ai.cmd` — Launches `ollama` with GPU passthrough and builds the `planner` model alias.
+### [3. Local Production Run](start/3-prod-full-local/)
+Runs the full production topology locally in its most secure posture (ports unpublished, except the API Gateway port 8080).
+*   `prod.cmd` — Packages and launches the secure production stack.
 
-### 2. Local Production Run (`prod.cmd`)
-Builds all Maven modules from the sibling repo, packages them, and brings up all projects containerized with strict health-gating:
-```cmd
-prod.cmd
-```
+### [4. Local Production Lite VPS](start/4-prod-lite-vps/)
+Deploys the runtime environment (without Ollama or local UI static hosting) to a remote VPS server.
+*   `deploy-vps.cmd` — Invokes the helper script to build and deploy to the VPS.
+*   `prod-lite.sh` — Bootstraps Docker containers on the remote VPS.
 
-### 3. Loopback Observability & Overlays
-*   `prod-local-obs.cmd` — Production-like run publishing Zipkin, Prometheus, and VictoriaLogs (`vmui` at `http://127.0.0.1:9428/select/vmui/`) to loopback only.
-*   `prod-overlays.cmd` — Production run with local observability and centralized log-file overlays enabled.
-
-### 4. VPS Hybrid Laptop Worker (`laptop-local-ai.cmd`)
-Launches the laptop-side local AI services for the VPS hybrid environment.
-```cmd
-laptop-local-ai.cmd
-```
-This script:
-1.  Starts the local knowledge DB (`knowledge_db`) on port **5433**.
-2.  Launches `ollama` and checks the local model alias.
-3.  Opens an SSH tunnel forwarding laptop `127.0.0.1:9092` to VPS `127.0.0.1:9092` (using connection details in `../hostInfo.txt`).
-4.  Starts `local-ai-service` in remote-worker mode, communicating through the SSH Kafka tunnel.
+### [5. Local Production Lite VPS Hybrid](start/5-prod-lite-vps-hybrid/)
+A hybrid setup where core services run on the remote VPS (via `deploy-vps.cmd`), while heavy Ollama AI processing, local database, and admin UI run on your local laptop.
+*   `deploy-vps.cmd` — Deploys the VPS side.
+*   `laptop-local-ai.cmd` — Opens an SSH tunnel to the VPS Kafka, starts local Postgres knowledge_db on 5433, local Ollama, and local-ai-service.
 
 ---
 
-## VPS Deployment Guide
+## VPS Deployment Prerequisites
 
-1.  Configure `../hostInfo.txt` and `prod-lite.env` locally on your laptop.
-2.  Run the deployment script from the parent directory:
-    ```cmd
-    cd /d D:\Project\LLMCouncil
-    deploy-vps.cmd
-    ```
-    This script builds JARs and UI bundles locally, bundles only safe non-secret artifacts, uploads the bundle to the VPS, injects the variables from `prod-lite.env` via SSH, and executes `prod-lite.sh` (VPS Compose orchestrator).
+1.  Ensure [`hostInfo.txt`](../hostInfo.txt) exists in the parent directory (`d:\Project\LLMCouncil\`) containing the target VPS connection details.
+2.  Navigate to either [`start/4-prod-lite-vps/`](start/4-prod-lite-vps/) or [`start/5-prod-lite-vps-hybrid/`](start/5-prod-lite-vps-hybrid/).
+3.  Configure the local `.env` file in that directory.
+4.  Run `.\deploy-vps.cmd` to start the deployment.
 
-For detailed steps, safety regulations, and firewall requirements, refer to the [VPS Integration and Deployment Runbook](file:///d:/Project/LLMCouncil/llm-council-docs/docs/runbooks/vps-integration-deployment.md).
+For detailed steps, safety regulations, and firewall requirements, refer to the [VPS Integration and Deployment Runbook](../llm-council-docs/docs/runbooks/vps-integration-deployment.md).

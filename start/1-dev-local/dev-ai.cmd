@@ -15,16 +15,19 @@ REM ============================================================================
 
 setlocal
 cd /d "%~dp0"
-set "ROOT=%~dp0"
-set "ENV_FILE=%ROOT%.env"
-set "AI_FILES=-f projects\ai-runtime\docker-compose.yml -f projects\ai-runtime\overlays\dev-ports.yml"
+set "ROOT=%~dp0..\..\"
+set "ENV_FILE=%~dp0.env"
+set "AI_FILES=-f %ROOT%projects\ai-runtime\docker-compose.yml -f %ROOT%projects\ai-runtime\overlays\dev-ports.yml"
+set "LOCAL_OBS_FILES=-f %ROOT%projects\observability\docker-compose.local.yml"
 
 echo.
-echo === [dev-ai] Ensuring llm-council-ai-runtime network exists ===
-docker network inspect llm-council-ai-runtime >NUL 2>&1
-if errorlevel 1 (
-    docker network create -d bridge llm-council-ai-runtime >NUL
-    echo Created network llm-council-ai-runtime.
+echo === [dev-ai] Ensuring external Docker networks exist ===
+for %%N in (data ai-runtime) do (
+    docker network inspect llm-council-%%N >NUL 2>&1
+    if errorlevel 1 (
+        docker network create -d bridge llm-council-%%N >NUL
+        echo Created network llm-council-%%N.
+    )
 )
 
 echo.
@@ -52,6 +55,13 @@ if errorlevel 1 (
     echo.
     echo Inspect:  docker compose --env-file "%ENV_FILE%" %AI_FILES% logs ollama
     exit /b 1
+)
+
+echo.
+echo === [dev-ai] Starting local observability (AGE Viewer + Arize Phoenix) ===
+docker compose --env-file "%ENV_FILE%" %LOCAL_OBS_FILES% up -d age-viewer arize-phoenix
+if errorlevel 1 (
+    echo Observability services failed. Non-fatal — continuing.
 )
 
 echo.

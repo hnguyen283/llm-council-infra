@@ -14,19 +14,20 @@ REM ============================================================================
 
 setlocal EnableExtensions
 cd /d "%~dp0"
+set "ROOT=%~dp0..\..\"
+set "ENV_FILE=%~dp0.env"
 
 if /i "%~1"=="--help" goto :help
 if /i "%~1"=="-h" goto :help
 
-set "ROOT=%~dp0"
-set "ENV_FILE=%ROOT%prod-lite.env"
 set "HOST_INFO=%ROOT%..\hostInfo.txt"
-set "AI_FILES=-f projects\ai-runtime\docker-compose.yml -f projects\ai-runtime\overlays\dev-ports.yml"
-set "LOCAL_DB_FILES=-f local\docker-compose.local-db.yml"
+set "AI_FILES=-f %ROOT%projects\ai-runtime\docker-compose.yml -f %ROOT%projects\ai-runtime\overlays\dev-ports.yml"
+set "LOCAL_DB_FILES=-f %ROOT%projects\data\docker-compose.local.yml"
+set "LOCAL_OBS_FILES=-f %ROOT%projects\observability\docker-compose.local.yml"
 
 if not exist "%ENV_FILE%" (
     echo ERROR: %ENV_FILE% does not exist.
-    echo Create prod-lite.env and set the prod-lite local/VPS runtime values.
+    echo Create .env in this directory and set the prod-lite local/VPS runtime values.
     exit /b 1
 )
 
@@ -57,7 +58,7 @@ if /i not "%LOCAL_AI_SSH_TUNNEL_ENABLED%"=="false" (
     )
     set "REMOTE_KAFKA_BOOTSTRAP_SERVERS=localhost:%LOCAL_AI_KAFKA_TUNNEL_PORT%"
 ) else if not defined REMOTE_KAFKA_BOOTSTRAP_SERVERS (
-    echo WARNING: REMOTE_KAFKA_BOOTSTRAP_SERVERS is not set in prod-lite.env.
+    echo WARNING: REMOTE_KAFKA_BOOTSTRAP_SERVERS is not set.
     echo          Falling back to localhost:9092 for local development only.
     set "REMOTE_KAFKA_BOOTSTRAP_SERVERS=localhost:9092"
 )
@@ -93,6 +94,13 @@ if errorlevel 1 (
     echo Local database failed to start. Inspect with:
     echo   docker compose --env-file "%ENV_FILE%" %LOCAL_DB_FILES% logs postgres-knowledge
     exit /b 1
+)
+
+echo.
+echo === [laptop-local-ai] Starting local observability (AGE Viewer + Arize Phoenix) ===
+docker compose --env-file "%ENV_FILE%" %LOCAL_OBS_FILES% up -d age-viewer arize-phoenix
+if errorlevel 1 (
+    echo Observability services failed. Non-fatal — continuing.
 )
 
 echo.
@@ -208,6 +216,6 @@ exit /b 0
 :help
 echo Usage: laptop-local-ai.cmd
 echo.
-echo Starts local knowledge database, Ollama, and local-ai-service using prod-lite.env.
-echo Opens SSH tunnel from 127.0.0.1:9092 to the VPS Kafka using ..\hostInfo.txt.
+echo Starts local knowledge database, Ollama, and local-ai-service using local .env.
+echo Opens SSH tunnel from 127.0.0.1:9092 to the VPS Kafka using hostInfo.txt.
 exit /b 0

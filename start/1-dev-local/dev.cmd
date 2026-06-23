@@ -16,14 +16,14 @@ REM ============================================================================
 
 setlocal
 cd /d "%~dp0"
-set "ROOT=%~dp0"
-set "ENV_FILE=%ROOT%.env"
+set "ROOT=%~dp0..\..\"
+set "ENV_FILE=%~dp0.env"
 
-set "DATA_FILES=-f projects\data\docker-compose.yml -f projects\data\overlays\dev-ports.yml"
-set "MESSAGING_FILES=-f projects\messaging\docker-compose.yml -f projects\messaging\overlays\dev-ports.yml"
-set "OBS_FILES=-f projects\observability\docker-compose.yml -f projects\observability\overlays\dev-ports.yml"
-set "PLAT_FILES=-f projects\platform\docker-compose.yml -f projects\platform\overlays\dev-ports.yml"
-set "GRAPHRAG_FILES=-f projects\graphrag\docker-compose.yml -f projects\graphrag\overlays\dev-ports.yml"
+set "DATA_FILES=-f %ROOT%projects\data\docker-compose.yml -f %ROOT%projects\data\overlays\dev-ports.yml"
+set "MESSAGING_FILES=-f %ROOT%projects\messaging\docker-compose.yml -f %ROOT%projects\messaging\overlays\dev-ports.yml"
+set "OBS_FILES=-f %ROOT%projects\observability\docker-compose.yml -f %ROOT%projects\observability\overlays\dev-ports.yml"
+set "PLAT_FILES=-f %ROOT%projects\platform\docker-compose.yml -f %ROOT%projects\platform\overlays\dev-ports.yml"
+set "GRAPHRAG_FILES=-f %ROOT%projects\graphrag\docker-compose.yml -f %ROOT%projects\graphrag\overlays\dev-ports.yml"
 
 echo.
 echo === [dev] Ensuring external Docker networks exist ===

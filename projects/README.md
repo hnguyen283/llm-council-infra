@@ -35,25 +35,19 @@ declared `external: true` in every project that joins them.
 Cross-project `depends_on` is NOT supported by Compose; the orchestrator scripts
 poll each project's healthchecks with `up -d --wait` between stages.
 
-## Orchestrator scripts (repo root)
+## Orchestrator Scripts (start/ Directory)
 
-| Script                  | Purpose                                                                                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prod.cmd`              | Production: only `api-gateway:8080` published. Brings up all core projects with health-gated staging.                                                 |
-| `prod-lite.cmd`         | Experimental hybrid local startup: data + messaging + platform + core fallback services; skips cloud Ollama, local-ai-service, and observability services. |
-| `prod-lite.sh`          | Linux VPS companion executed by the parent `deploy-vps.cmd` flow after `prod-lite.env` values are injected through SSH. Starts data, messaging, platform, core, and Graph-RAG overlays. |
-| `prod-lite-local-ai.cmd` | Starts the laptop side of the hybrid profile: Ollama plus `local-ai-service` in remote-worker mode through an SSH Kafka tunnel.                       |
-| `prod-local-obs.cmd`    | Same as `prod.cmd`, plus layers `projects/observability/overlays/local-observability.yml` so Prometheus/Zipkin/VictoriaLogs publish to loopback only. |
-| `prod-overlays.cmd`     | Local production-like validation with local observability and log-file overlays enabled.                                                              |
-| `dev.cmd`               | Brings up data + messaging + observability (zipkin only) + platform's `discovery-server` (`--no-deps`). Used with an IDE-launched `config-server`.   |
-| `dev-ai.cmd`            | Brings up `ollama` on the `llm-council-ai-runtime` network and pulls `deepseek-r1:7b`.                                                               |
+All startup and deployment entrypoints are organized under the [`start/`](../start/) folder to isolate configurations:
 
-Development scripts forward `--env-file <repo-root>/.env` so the root `.env`
-remains the local development source of truth. The prod-lite laptop worker and
-VPS deployment wrapper are stricter: they read `prod-lite.env` on the laptop,
-refuse to bundle `.env*`, `prod-lite.env`, or key/certificate material, and
-inject VPS runtime values over SSH while remote Compose runs with
-`--env-file /dev/null`.
+| Option | Directory | Key Script(s) | Purpose |
+| :--- | :--- | :--- | :--- |
+| **1** | [`start/1-dev-local/`](../start/1-dev-local/) | `dev.cmd`, `dev-ai.cmd` | Local Development: Starts postgres/valkey/kafka/zipkin/discovery in Docker while you run Java services in your IDE. `dev-ai.cmd` starts Ollama and local observability (AGE Viewer, Arize Phoenix). |
+| **2** | [`start/2-staging-local/`](../start/2-staging-local/) | `prod-overlays.cmd` | Local Staging: Starts the full production topology locally in Docker with loopback observability overlays (Zipkin, Prometheus, VictoriaLogs, Alloy, AGE Viewer, Phoenix). |
+| **3** | [`start/3-prod-full-local/`](../start/3-prod-full-local/) | `prod.cmd` | Local Production: Starts the full split-production topology locally with only `api-gateway` port 8080 exposed. |
+| **4** | [`start/4-prod-lite-vps/`](../start/4-prod-lite-vps/) | `deploy-vps.cmd` | VPS Deployment: Builds and deploys the core platform stack to a remote VPS server. |
+| **5** | [`start/5-prod-lite-vps-hybrid/`](../start/5-prod-lite-vps-hybrid/) | `deploy-vps.cmd`, `laptop-local-ai.cmd` | VPS Hybrid: Deploys core services to the VPS, while running heavy AI workloads, local database, and admin UI on your local laptop. |
+
+Each script automatically sets the current working directory to the repository root before executing, ensuring relative paths in Compose files and Maven build contexts resolve correctly.
 The prod scripts run `docker info` before touching networks or Compose
 projects, so a stopped Docker Desktop or bad Docker context fails fast with an
 actionable message.
