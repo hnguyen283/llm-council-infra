@@ -41,6 +41,7 @@ set "AI_FILES=-f %ROOT%projects\ai-runtime\docker-compose.yml"
 set "OBS_FILES=-f %ROOT%projects\observability\docker-compose.yml -f %ROOT%projects\observability\overlays\prod.yml"
 set "PLAT_FILES=-f %ROOT%projects\platform\docker-compose.yml -f %ROOT%projects\platform\overlays\prod.yml"
 set "CORE_FILES=-f %ROOT%projects\core\docker-compose.yml -f %ROOT%projects\core\overlays\prod.yml"
+set "GRAPHRAG_FILES=-f %ROOT%projects\graphrag\docker-compose.yml"
 
 call :main
 set "EXIT_CODE=%ERRORLEVEL%"
@@ -69,6 +70,46 @@ for %%V in (AUTH_JWT_PRIVATE_KEY_PEM AUTH_JWT_PUBLIC_KEYS_PEM GATEWAY_INTERNAL_P
 )
 
 echo.
+echo === [prod] Validating Graph-RAG Mode and Alias ===
+set "GRAPHRAG_MODE="
+set "GRAPHRAG_ENABLED="
+
+if exist "%ENV_FILE%" (
+    for /f "usebackq tokens=1,2 delims==" %%A in ("%ENV_FILE%") do (
+        if "%%A"=="GRAPHRAG_MODE" set "GRAPHRAG_MODE=%%~B"
+        if "%%A"=="GRAPHRAG_ENABLED" set "GRAPHRAG_ENABLED=%%~B"
+    )
+)
+
+if "%GRAPHRAG_MODE%"=="" (
+    if "%GRAPHRAG_ENABLED%"=="true" (
+        set "GRAPHRAG_MODE=optional"
+    ) else if "%GRAPHRAG_ENABLED%"=="false" (
+        set "GRAPHRAG_MODE=disabled"
+    ) else (
+        set "GRAPHRAG_MODE=disabled"
+    )
+)
+
+if NOT "%GRAPHRAG_MODE%"=="disabled" if NOT "%GRAPHRAG_MODE%"=="optional" if NOT "%GRAPHRAG_MODE%"=="required" (
+    echo ERROR: Invalid GRAPHRAG_MODE '%GRAPHRAG_MODE%'. Must be one of: disabled, optional, required.
+    exit /b 1
+)
+
+echo Graph-RAG mode validated: GRAPHRAG_MODE=%GRAPHRAG_MODE%
+
+if "%GRAPHRAG_MODE%"=="disabled" (
+    set "GRAPHRAG_ENABLED=false"
+) else (
+    findstr /B /R /C:"GRAPHRAG_DB_PASSWORD=." "%ENV_FILE%" >NUL 2>&1
+    if errorlevel 1 (
+        echo ERROR: GRAPHRAG_DB_PASSWORD is empty or missing from .env while Graph-RAG is %GRAPHRAG_MODE%.
+        exit /b 1
+    )
+    set "GRAPHRAG_ENABLED=true"
+)
+
+echo.
 echo === [prod] Ensuring external Docker networks exist ===
 call :ensure_network llm-council-data
 call :ensure_network llm-council-messaging
@@ -93,6 +134,7 @@ echo === [prod] Tearing down existing projects (reverse order) ===
 docker compose --env-file "%ENV_FILE%" %CORE_FILES%      down --remove-orphans
 docker compose --env-file "%ENV_FILE%" %PLAT_FILES%      down --remove-orphans
 docker compose --env-file "%ENV_FILE%" %OBS_FILES%       down --remove-orphans
+docker compose --env-file "%ENV_FILE%" %GRAPHRAG_FILES%  down --remove-orphans
 docker compose --env-file "%ENV_FILE%" %AI_FILES%        down --remove-orphans
 docker compose --env-file "%ENV_FILE%" %MESSAGING_FILES% down --remove-orphans
 docker compose --env-file "%ENV_FILE%" %DATA_FILES%      down --remove-orphans
@@ -104,12 +146,25 @@ if errorlevel 1 ( echo Platform build failed. Aborting. & exit /b 1 )
 docker compose --env-file "%ENV_FILE%" %CORE_FILES% build --no-cache
 if errorlevel 1 ( echo Core build failed. Aborting. & exit /b 1 )
 
+if NOT "%GRAPHRAG_MODE%"=="disabled" (
+    echo === [prod] Rebuilding Graph-RAG images (no cache) ===
+    docker compose --env-file "%ENV_FILE%" %GRAPHRAG_FILES% build --no-cache
+    if errorlevel 1 ( echo Graph-RAG build failed. Aborting. & exit /b 1 )
+)
+
 echo.
 echo === [prod] Validating merged Compose configs (each project) ===
 for %%P in ("%DATA_FILES%" "%MESSAGING_FILES%" "%AI_FILES%" "%OBS_FILES%" "%PLAT_FILES%" "%CORE_FILES%") do (
     docker compose --env-file "%ENV_FILE%" %%~P config --quiet
     if errorlevel 1 (
         echo Compose config validation failed for %%~P. Aborting.
+        exit /b 1
+    )
+)
+if NOT "%GRAPHRAG_MODE%"=="disabled" (
+    docker compose --env-file "%ENV_FILE%" %GRAPHRAG_FILES% config --quiet
+    if errorlevel 1 (
+        echo Compose config validation failed for Graph-RAG. Aborting.
         exit /b 1
     )
 )
@@ -137,6 +192,19 @@ if errorlevel 1 exit /b 1
 
 call :up_project "platform tier"      "%PLAT_FILES%"      "config-server discovery-server"
 if errorlevel 1 exit /b 1
+
+if NOT "%GRAPHRAG_MODE%"=="disabled" (
+    call :up_project "graphrag tier" "%GRAPHRAG_FILES%" "graphrag-retrieval-service graphrag-indexing-worker"
+    if errorlevel 1 (
+        if "%GRAPHRAG_MODE%"=="required" (
+            echo ERROR: Graph-RAG tier failed to start or is unhealthy, and mode is required. Aborting.
+            exit /b 1
+        ) else (
+            echo WARNING: Graph-RAG tier failed to start or is unhealthy, but mode is optional. Continuing...
+            set "GRAPHRAG_ENABLED=false"
+        )
+    )
+)
 
 call :up_project "core: identity+edge" "%CORE_FILES%"     "account-service auth-service api-gateway"
 if errorlevel 1 exit /b 1

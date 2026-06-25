@@ -76,6 +76,8 @@ services:
       GATEWAY_INTERNAL_TTL_SECONDS:     ${GATEWAY_INTERNAL_TTL_SECONDS:-300}
       GATEWAY_INTERNAL_PRIVATE_KEY_PEM: ${GATEWAY_INTERNAL_PRIVATE_KEY_PEM}
       GATEWAY_INTERNAL_PUBLIC_KEYS_PEM: ${GATEWAY_INTERNAL_PUBLIC_KEYS_PEM}
+      ACCOUNT_SERVICE_URL:              http://account-service:8087
+      ACCOUNT_INTERNAL_SERVICE_TOKEN:   ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
       interval: 5s
