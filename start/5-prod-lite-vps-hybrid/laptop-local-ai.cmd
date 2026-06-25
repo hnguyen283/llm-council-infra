@@ -153,7 +153,11 @@ set "SPRING_KAFKA_CONSUMER_GROUP_ID=local-ai-workers"
 set "SERVER_PORT=8086"
 set "EUREKA_CLIENT_REGISTER_WITH_EUREKA=false"
 set "EUREKA_CLIENT_FETCH_REGISTRY=false"
-set "MANAGEMENT_TRACING_SAMPLING_PROBABILITY=0.0"
+set "MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0"
+set "MANAGEMENT_OTLP_TRACING_ENDPOINT=http://127.0.0.1:4318/v1/traces"
+set "MANAGEMENT_OTLP_TRACING_TRANSPORT=http"
+set "MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED=false"
+
 set "OLLAMA_BASE_URL=http://localhost:11434"
 set "LOCAL_AI_BASE_URL=http://localhost:11434"
 set "LOCAL_AI_HEARTBEAT_ENABLED=true"
@@ -186,23 +190,26 @@ exit /b 0
 
 :start_kafka_tunnel
 echo.
-echo === [laptop-local-ai] Starting SSH tunnel for Kafka ===
+echo === [laptop-local-ai] Checking local Arize Phoenix OTLP ports ===
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$deadline=(Get-Date).AddSeconds(10); do { $ok1=Test-NetConnection -ComputerName 127.0.0.1 -Port 4317 -InformationLevel Quiet; $ok2=Test-NetConnection -ComputerName 127.0.0.1 -Port 4318 -InformationLevel Quiet; if ($ok1 -and $ok2) { break }; Start-Sleep -Milliseconds 500 } until ((Get-Date) -gt $deadline); if (-not ($ok1 -and $ok2)) { Write-Host 'WARNING: Arize Phoenix is not responding on OTLP ports 4317/4318. Traces may not be forwarded.' -ForegroundColor Yellow } else { Write-Host 'Arize Phoenix OTLP ports are listening locally.' -ForegroundColor Green }"
+
+echo === [laptop-local-ai] Starting SSH tunnel for Kafka & OTLP Traces ===
 where plink.exe >NUL 2>&1
 if errorlevel 1 (
     echo ERROR: plink.exe was not found on PATH. Install PuTTY or set LOCAL_AI_SSH_TUNNEL_ENABLED=false.
     exit /b 1
 )
-for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $plink=(Get-Command plink.exe -ErrorAction Stop).Source; $args=@('-ssh','-N','-batch','-P',$env:VPS_SSH_PORT,'-l',$env:VPS_SSH_USER,'-pw',$env:VPS_SSH_PASSWORD,'-L',('127.0.0.1:'+$env:LOCAL_AI_KAFKA_TUNNEL_PORT+':127.0.0.1:9092'),$env:VPS_SSH_HOST); $p=Start-Process -FilePath $plink -ArgumentList $args -WindowStyle Hidden -PassThru; $p.Id"`) do set "KAFKA_TUNNEL_PID=%%P"
+for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $plink=(Get-Command plink.exe -ErrorAction Stop).Source; $args=@('-ssh','-N','-batch','-P',$env:VPS_SSH_PORT,'-l',$env:VPS_SSH_USER,'-pw',$env:VPS_SSH_PASSWORD,'-L',('127.0.0.1:'+$env:LOCAL_AI_KAFKA_TUNNEL_PORT+':127.0.0.1:9092'),'-R','0.0.0.0:4318:127.0.0.1:4318','-R','0.0.0.0:4317:127.0.0.1:4317',$env:VPS_SSH_HOST); $p=Start-Process -FilePath $plink -ArgumentList $args -WindowStyle Hidden -PassThru; $p.Id"`) do set "KAFKA_TUNNEL_PID=%%P"
 if not defined KAFKA_TUNNEL_PID (
-    echo ERROR: failed to start the Kafka SSH tunnel.
+    echo ERROR: failed to start the SSH tunnel.
     exit /b 1
 )
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$deadline=(Get-Date).AddSeconds(20); do { Start-Sleep -Milliseconds 500; $ok=(Test-NetConnection -ComputerName 127.0.0.1 -Port ([int]$env:LOCAL_AI_KAFKA_TUNNEL_PORT) -InformationLevel Quiet) } until ($ok -or (Get-Date) -gt $deadline); if (-not $ok) { exit 1 }"
 if errorlevel 1 (
-    echo ERROR: Kafka SSH tunnel did not become reachable on 127.0.0.1:%LOCAL_AI_KAFKA_TUNNEL_PORT%.
+    echo ERROR: SSH tunnel did not become reachable on 127.0.0.1:%LOCAL_AI_KAFKA_TUNNEL_PORT%.
     exit /b 1
 )
-echo Kafka SSH tunnel is ready on 127.0.0.1:%LOCAL_AI_KAFKA_TUNNEL_PORT%.
+echo SSH tunnel is ready. Kafka forwarded to 127.0.0.1:%LOCAL_AI_KAFKA_TUNNEL_PORT%. OTLP remote forwarding active.
 exit /b 0
 
 :stop_kafka_tunnel

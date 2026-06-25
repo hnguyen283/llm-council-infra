@@ -24,14 +24,14 @@ services:
           memory: 512M
 
   # Arize Phoenix — OTel trace ingestion, RAG evaluation, embedding visualization.
-  # OTLP/gRPC on 4317, OTLP/HTTP on 4318, Web UI on 6006.
+  # OTLP/gRPC on 4317, OTLP/HTTP mapped on 4318 (to container 6006), Web UI on 6006.
   arize-phoenix:
     image: arizephoenix/phoenix:latest
     restart: unless-stopped
     ports:
       - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:6006:6006"
       - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:4317:4317"
-      - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:4318:4318"
+      - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:4318:6006"
     environment:
       PHOENIX_PORT: "6006"
       PHOENIX_HOST: "0.0.0.0"

@@ -150,11 +150,20 @@ dc "${CORE_FILES[@]}" build --no-cache \
   prompt-service \
   gemini-service \
   gpt-service
+
+if [[ "${GRAPHRAG_ENABLED:-false}" == "true" ]]; then
+  printf '\n=== [prod-lite.sh] Building GraphRAG images ===\n'
+  dc "${GRAPHRAG_FILES[@]}" build --no-cache graphrag-retrieval-service graphrag-indexing-worker
+fi
+
 printf '\n=== [prod-lite.sh] Validating Compose config ===\n'
 dc "${DATA_FILES[@]}" config --quiet
 dc "${MESSAGING_FILES[@]}" config --quiet
 dc "${PLAT_FILES[@]}" config --quiet
 dc "${CORE_FILES[@]}" config --quiet
+if [[ "${GRAPHRAG_ENABLED:-false}" == "true" ]]; then
+  dc "${GRAPHRAG_FILES[@]}" config --quiet
+fi
 
 printf '\n=== [prod-lite.sh] Starting data tier ===\n'
 dc "${DATA_FILES[@]}" up -d --wait --wait-timeout "$WAIT_SECONDS" postgres valkey
@@ -165,6 +174,11 @@ dc "${MESSAGING_FILES[@]}" up -d --wait --wait-timeout "$WAIT_SECONDS" kafka
 
 printf '\n=== [prod-lite.sh] Starting platform tier ===\n'
 dc "${PLAT_FILES[@]}" up -d --wait --wait-timeout "$WAIT_SECONDS" config-server discovery-server
+
+if [[ "${GRAPHRAG_ENABLED:-false}" == "true" ]]; then
+  printf '\n=== [prod-lite.sh] Starting GraphRAG tier ===\n'
+  dc "${GRAPHRAG_FILES[@]}" up -d --wait --wait-timeout "$WAIT_SECONDS" graphrag-retrieval-service graphrag-indexing-worker
+fi
 
 printf '\n=== [prod-lite.sh] Starting core identity and gateway ===\n'
 dc "${CORE_FILES[@]}" up -d --wait --wait-timeout "$WAIT_SECONDS" account-service auth-service api-gateway

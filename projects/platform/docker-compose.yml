@@ -32,6 +32,7 @@ services:
     environment:
       <<: *jvm-common
       CONFIG_REPO_PATH: file:/config-repo
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
     volumes:
       - ../../../llm-council/config-repo:/config-repo:ro
     healthcheck:

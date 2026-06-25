@@ -39,6 +39,7 @@ x-jvm-common: &jvm-common
   JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
   LANG: "C.UTF-8"
   LC_ALL: "C.UTF-8"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
 
 services:
 
@@ -46,6 +47,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/api-gateway:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/api-gateway, dockerfile: Dockerfile }
     networks: [llm-council-data, llm-council-observability, llm-council-platform, llm-council-app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -86,6 +89,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/auth-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/auth-service, dockerfile: Dockerfile }
     networks: [llm-council-data, llm-council-observability, llm-council-platform, llm-council-app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -122,6 +127,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/account-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/account-service, dockerfile: Dockerfile }
     networks: [llm-council-data, llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -142,6 +149,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/orchestrator-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/orchestrator-service, dockerfile: Dockerfile }
     networks: [llm-council-data, llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -180,6 +189,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/gemini-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/gemini-service, dockerfile: Dockerfile }
     networks: [llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -196,6 +207,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/gpt-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/gpt-service, dockerfile: Dockerfile }
     networks: [llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -212,6 +225,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/prompt-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/prompt-service, dockerfile: Dockerfile }
     networks: [llm-council-data, llm-council-observability, llm-council-platform, llm-council-app]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -235,6 +250,8 @@ services:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/local-ai-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/local-ai-service, dockerfile: Dockerfile }
     networks: [llm-council-messaging, llm-council-observability, llm-council-platform, llm-council-app, llm-council-ai-runtime]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
