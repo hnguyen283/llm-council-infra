@@ -43,6 +43,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *jvm-prod
+      ORCHESTRATOR_JOB_STORE: valkey
 
   gemini-service:
     restart: unless-stopped
