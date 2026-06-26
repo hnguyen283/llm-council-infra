@@ -175,6 +175,7 @@ services:
       GRAPHRAG_TARGET:                       ${GRAPHRAG_TARGET:-graphrag-retrieval-service:50051}
       GRAPHRAG_DEADLINE_MS:                  ${GRAPHRAG_DEADLINE_MS:-5000}
       GRAPHRAG_MOCK_ENABLED:                 ${GRAPHRAG_MOCK_ENABLED:-false}
+      TENANT_NAMESPACE_HMAC_KEY:             ${TENANT_NAMESPACE_HMAC_KEY:-}
       QUICK_ANSWER_A1_PROVIDER_ORDER:        ${QUICK_ANSWER_A1_PROVIDER_ORDER:-local,openai-mini,gemini-flash-lite}
       QUICK_ANSWER_A1_TIMEOUT_MS:            ${QUICK_ANSWER_A1_TIMEOUT_MS:-4000}
       QUICK_ANSWER_A1_FAIL_OPEN:             ${QUICK_ANSWER_A1_FAIL_OPEN:-true}
