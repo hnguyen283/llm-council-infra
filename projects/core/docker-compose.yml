@@ -140,6 +140,9 @@ services:
       DB_PASSWORD: ${ACCOUNT_DB_PASSWORD}
       ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
       ACCOUNT_INTERNAL_AUTH_ENABLED:  ${ACCOUNT_INTERNAL_AUTH_ENABLED:-false}
+      GATEWAY_INTERNAL_JWKS_URI: http://api-gateway:8080/.well-known/internal-jwks.json
+      GATEWAY_INTERNAL_ISSUER:   ${GATEWAY_INTERNAL_ISSUER:-internal:api-gateway}
+      GATEWAY_INTERNAL_AUDIENCE: ${GATEWAY_INTERNAL_AUDIENCE:-internal}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8087/actuator/health | grep -q '\"status\":\"UP\"'"]
       interval: 5s
