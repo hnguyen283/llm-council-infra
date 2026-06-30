@@ -46,12 +46,14 @@ Render an option without starting containers:
 
 ```bat
 scripts\config.bat prod-full-local-http
+scripts\config.bat prod-lite-local
 scripts\config.bat dev-full-http
 scripts\config.bat prod-full-local-observability
 ```
 
 ```sh
 ./scripts/config.sh prod-full-local-http
+./scripts/config.sh prod-lite-local
 ./scripts/config.sh dev-full-http
 ./scripts/config.sh prod-full-local-observability
 ```
@@ -60,10 +62,12 @@ Run prerequisite and required-secret checks:
 
 ```bat
 scripts\doctor.bat prod-full-local-http
+scripts\doctor.bat prod-lite-local
 ```
 
 ```sh
 ./scripts/doctor.sh prod-full-local-http
+./scripts/doctor.sh prod-lite-local
 ```
 
 Generated diagnostics are written under `.generated/<option>/` and are ignored.
@@ -72,6 +76,7 @@ Start a local Compose option:
 
 ```bat
 scripts\start.bat prod-full-local-http
+scripts\start.bat prod-lite-local
 scripts\start.bat prod-full-local-https
 scripts\start.bat prod-full-local-https-tunnel
 scripts\start.bat dev-full-http
@@ -93,6 +98,7 @@ scripts\generate-local-tls.bat
 | `dev-full-http` | `scripts\start.bat dev-full-http` | Full Docker-managed local development stack. |
 | `dev-local-ai` | `scripts\start.bat dev-local-ai` | Ollama plus local observability for IDE-hosted `local-ai-service`. |
 | `prod-full-local-http` | `scripts\start.bat prod-full-local-http` | Production-like local HTTP stack behind the Nginx Portal edge. |
+| `prod-lite-local` | `scripts\start.bat prod-lite-local` | Full-capability production-lite local stack for constrained laptops; excludes observability containers by default. |
 | `prod-full-local-https` | `scripts\start.bat prod-full-local-https` | Production-like local HTTPS stack behind the Nginx Portal edge. |
 | `prod-full-local-https-tunnel` | `scripts\start.bat prod-full-local-https-tunnel` | HTTPS stack with Cloudflare tunnel sidecar. |
 | `prod-full-local-observability` | `scripts\start.bat prod-full-local-observability` | Production-like HTTP stack with local observability and file-log overlays. |

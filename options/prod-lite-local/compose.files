@@ -1,0 +1,7 @@
+compose/compose.yaml
+compose/compose.graphrag.yaml
+compose/compose.startup-gates.yaml
+compose/compose.prod.yaml
+compose/compose.prod-lite-local.yaml
+compose/compose.ui-nginx.yaml
+compose/compose.edge-http.yaml

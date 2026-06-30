@@ -122,7 +122,7 @@ if docker compose -f "$GENERATED" ps postgres >/dev/null 2>&1; then
   docker compose -f "$GENERATED" exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
 fi
 
-if [ "$OPTION_KIND" = "local-ai-runtime" ] && [ "$LOCAL_AI_PREPARE_MODEL" = "true" ]; then
+if [ "$LOCAL_AI_PREPARE_MODEL" = "true" ]; then
   echo "=== [start] Preparing Ollama model $LOCAL_AI_BASE_MODEL and alias $LOCAL_AI_MODEL ==="
   docker compose -f "$GENERATED" exec ollama ollama pull "$LOCAL_AI_BASE_MODEL"
   docker compose -f "$GENERATED" exec ollama ollama create "$LOCAL_AI_MODEL" -f /Modelfile.planner

@@ -83,7 +83,7 @@ if not errorlevel 1 (
   if errorlevel 1 exit /b 1
 )
 
-if /I "%OPTION_KIND%"=="local-ai-runtime" if /I "%LOCAL_AI_PREPARE_MODEL%"=="true" (
+if /I "%LOCAL_AI_PREPARE_MODEL%"=="true" (
   echo.
   echo === [start] Preparing Ollama model %LOCAL_AI_BASE_MODEL% and alias %LOCAL_AI_MODEL% ===
   docker compose -f "%GENERATED%" exec ollama ollama pull "%LOCAL_AI_BASE_MODEL%"

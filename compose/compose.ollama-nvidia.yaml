@@ -1,0 +1,14 @@
+# Optional NVIDIA reservation for Ollama.
+#
+# The generic ai-runtime topology stays CPU-safe by default. Include this
+# overlay only on machines where Docker Desktop is configured with NVIDIA
+# Container Toolkit support.
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,6 @@
+# GraphRAG semantic-compose bridge.
+#
+# Keep the tier-owned service definitions under projects/graphrag/ while
+# allowing semantic options to opt into GraphRAG through the compose/ layer.
+include:
+  - ../projects/graphrag/docker-compose.yml

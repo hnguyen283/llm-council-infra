@@ -14,13 +14,18 @@ echo "=== Docker ==="
 docker compose version
 docker info >/dev/null
 
+MODE=http
+if grep -qi '^PUBLIC_SCHEME=https' "$OPTION_DIR/option.env"; then
+  MODE=https
+fi
+
 echo
 echo "=== Option manifest ==="
 "$ROOT/scripts/config.sh" "$OPTION"
 
 find_value() {
   target=$1
-  for env_file in "$ROOT/env/defaults.env" "$ROOT/env/workspace.env" "$ROOT/env/modes/http.env" "$OPTION_DIR/option.env" "$ROOT/env/local.user.override.env"; do
+  for env_file in "$ROOT/env/defaults.env" "$ROOT/env/workspace.env" "$ROOT/env/modes/$MODE.env" "$OPTION_DIR/option.env" "$OPTION_DIR/.env" "$ROOT/env/local.user.override.env"; do
     [ -f "$env_file" ] || continue
     value=$(awk -F= -v k="$target" '$1 == k {print substr($0, length(k) + 2)}' "$env_file" | tail -n 1)
     if [ -n "$value" ]; then
@@ -34,7 +39,11 @@ find_value() {
 echo
 echo "=== Required secret presence ==="
 missing=0
-for key in POSTGRES_PASSWORD ACCOUNT_DB_PASSWORD PROMPT_DB_PASSWORD VALKEY_PASSWORD AUTH_JWT_PRIVATE_KEY_PEM AUTH_JWT_PUBLIC_KEYS_PEM GATEWAY_INTERNAL_PRIVATE_KEY_PEM GATEWAY_INTERNAL_PUBLIC_KEYS_PEM ACCOUNT_INTERNAL_SERVICE_TOKEN TENANT_NAMESPACE_HMAC_KEY; do
+required_keys="POSTGRES_PASSWORD ACCOUNT_DB_PASSWORD PROMPT_DB_PASSWORD VALKEY_PASSWORD AUTH_JWT_PRIVATE_KEY_PEM AUTH_JWT_PUBLIC_KEYS_PEM GATEWAY_INTERNAL_PRIVATE_KEY_PEM GATEWAY_INTERNAL_PUBLIC_KEYS_PEM ACCOUNT_INTERNAL_SERVICE_TOKEN TENANT_NAMESPACE_HMAC_KEY"
+if [ "$(find_value GRAPHRAG_ENABLED)" = "true" ]; then
+  required_keys="$required_keys GRAPHRAG_DB_PASSWORD"
+fi
+for key in $required_keys; do
   value=$(find_value "$key")
   if [ -z "$value" ]; then
     echo "MISSING: $key"

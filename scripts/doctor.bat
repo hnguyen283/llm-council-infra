@@ -33,7 +33,10 @@ if errorlevel 1 exit /b 1
 echo.
 echo === Required secret presence ===
 set "MISSING=0"
-for %%V in (POSTGRES_PASSWORD ACCOUNT_DB_PASSWORD PROMPT_DB_PASSWORD VALKEY_PASSWORD AUTH_JWT_PRIVATE_KEY_PEM AUTH_JWT_PUBLIC_KEYS_PEM GATEWAY_INTERNAL_PRIVATE_KEY_PEM GATEWAY_INTERNAL_PUBLIC_KEYS_PEM ACCOUNT_INTERNAL_SERVICE_TOKEN TENANT_NAMESPACE_HMAC_KEY) do (
+set "REQUIRED_SECRETS=POSTGRES_PASSWORD ACCOUNT_DB_PASSWORD PROMPT_DB_PASSWORD VALKEY_PASSWORD AUTH_JWT_PRIVATE_KEY_PEM AUTH_JWT_PUBLIC_KEYS_PEM GATEWAY_INTERNAL_PRIVATE_KEY_PEM GATEWAY_INTERNAL_PUBLIC_KEYS_PEM ACCOUNT_INTERNAL_SERVICE_TOKEN TENANT_NAMESPACE_HMAC_KEY"
+call :find_value GRAPHRAG_ENABLED
+if /I "!FOUND_VALUE!"=="true" set "REQUIRED_SECRETS=!REQUIRED_SECRETS! GRAPHRAG_DB_PASSWORD"
+for %%V in (!REQUIRED_SECRETS!) do (
   call :find_value %%V
   if "!FOUND_VALUE!"=="" (
     echo MISSING: %%V
@@ -55,7 +58,7 @@ exit /b 0
 :find_value
 set "TARGET=%~1"
 set "FOUND_VALUE="
-for %%F in ("%ROOT%\env\defaults.env" "%ROOT%\env\workspace.env" "%ROOT%\env\modes\%MODE%.env" "%OPTION_DIR%\option.env" "%ROOT%\env\local.user.override.env") do (
+for %%F in ("%ROOT%\env\defaults.env" "%ROOT%\env\workspace.env" "%ROOT%\env\modes\%MODE%.env" "%OPTION_DIR%\option.env" "%OPTION_DIR%\.env" "%ROOT%\env\local.user.override.env") do (
   if exist "%%~F" (
     for /f "usebackq tokens=1,* delims==" %%A in ("%%~F") do (
       if "%%A"=="%TARGET%" set "FOUND_VALUE=%%B"
