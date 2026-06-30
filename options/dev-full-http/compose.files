@@ -1,2 +1,3 @@
 compose/compose.yaml
+compose/compose.startup-gates.yaml
 compose/compose.dev.yaml

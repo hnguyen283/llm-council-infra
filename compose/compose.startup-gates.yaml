@@ -1,0 +1,25 @@
+# Full-stack startup ordering for semantic Compose options.
+#
+# The project tier files remain runnable on their own, so cross-tier readiness
+# gates live here where data, platform, and core services are included together.
+services:
+  account-service:
+    depends_on:
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+
+  auth-service:
+    depends_on:
+      account-service: { condition: service_healthy }
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+
+  api-gateway:
+    depends_on:
+      account-service: { condition: service_healthy }
+      auth-service: { condition: service_healthy }
+      config-server: { condition: service_healthy }
+      discovery-server: { condition: service_healthy }
+      valkey: { condition: service_healthy }

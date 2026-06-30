@@ -9,6 +9,8 @@ if "%~1"=="" (
 )
 set "DRY_RUN=false"
 if /I "%~2"=="--dry-run" set "DRY_RUN=true"
+set "START_WAIT_TIMEOUT_SECONDS=%START_WAIT_TIMEOUT_SECONDS%"
+if not defined START_WAIT_TIMEOUT_SECONDS set "START_WAIT_TIMEOUT_SECONDS=600"
 
 set "OPTION_DIR=%ROOT%\options\%OPTION%"
 if not exist "%OPTION_DIR%\option.env" (
@@ -67,8 +69,11 @@ if /I not "%OPTION_KIND%"=="local-ai-runtime" (
 
 echo.
 echo === [start] Starting %OPTION% from rendered Compose config ===
-docker compose -f "%GENERATED%" up -d --build --wait --wait-timeout 300
-if errorlevel 1 exit /b 1
+docker compose -f "%GENERATED%" up -d --build --wait --wait-timeout %START_WAIT_TIMEOUT_SECONDS%
+if errorlevel 1 (
+  call :dump_start_failure "%GENERATED%"
+  exit /b 1
+)
 
 docker compose -f "%GENERATED%" ps postgres >NUL 2>&1
 if not errorlevel 1 (
@@ -103,18 +108,71 @@ if errorlevel 1 (
 )
 exit /b 0
 
+:dump_start_failure
+set "COMPOSE_CONFIG=%~1"
+echo.
+echo === [start] Startup failed; targeted diagnostics follow ===
+echo Compose services:
+docker compose -f "%COMPOSE_CONFIG%" ps
+for %%S in (api-gateway auth-service account-service config-server discovery-server valkey postgres) do (
+  echo.
+  echo --- %%S status ---
+  docker compose -f "%COMPOSE_CONFIG%" ps %%S
+  echo --- %%S logs ^(tail 160^) ---
+  docker compose -f "%COMPOSE_CONFIG%" logs --tail=160 %%S
+)
+set "GATEWAY_CONTAINER="
+for /f "delims=" %%C in ('docker compose -f "%COMPOSE_CONFIG%" ps -q api-gateway 2^>NUL') do set "GATEWAY_CONTAINER=%%C"
+if defined GATEWAY_CONTAINER (
+  echo.
+  echo --- api-gateway Docker health state ---
+  docker inspect "%GATEWAY_CONTAINER%" --format "{{json .State.Health}}"
+)
+exit /b 0
+
 :pin_docker_api_version
 set "ORIGINAL_DOCKER_API_VERSION=%DOCKER_API_VERSION%"
-set "DOCKER_API_VERSION="
+set "ORIGINAL_DOCKER_HOST=%DOCKER_HOST%"
 set "SERVER_DOCKER_API_VERSION="
-for /f "delims=" %%V in ('docker version --format "{{.Server.APIVersion}}" 2^>NUL') do set "SERVER_DOCKER_API_VERSION=%%V"
-if defined SERVER_DOCKER_API_VERSION (
-  set "DOCKER_API_VERSION=%SERVER_DOCKER_API_VERSION%"
-  echo Docker Engine API version: %SERVER_DOCKER_API_VERSION%
+set "PINNED_DOCKER_API_VERSION="
+
+call :probe_docker_api_versions
+if not errorlevel 1 goto docker_api_pinned
+
+if not defined ORIGINAL_DOCKER_HOST (
+  set "DOCKER_HOST=npipe:////./pipe/docker_engine"
+  set "SERVER_DOCKER_API_VERSION="
+  set "PINNED_DOCKER_API_VERSION="
+  call :probe_docker_api_versions
+  if not errorlevel 1 (
+    echo Docker context pipe failed; using Docker Desktop fallback pipe npipe:////./pipe/docker_engine
+    goto docker_api_pinned
+  )
+  set "DOCKER_HOST="
+)
+
+:docker_api_pinned
+if defined PINNED_DOCKER_API_VERSION (
+  set "DOCKER_API_VERSION=%PINNED_DOCKER_API_VERSION%"
+  echo Docker Engine API version pinned to %PINNED_DOCKER_API_VERSION% ^(server reports %SERVER_DOCKER_API_VERSION%^)
   exit /b 0
 )
+
 if defined ORIGINAL_DOCKER_API_VERSION set "DOCKER_API_VERSION=%ORIGINAL_DOCKER_API_VERSION%"
+if defined ORIGINAL_DOCKER_HOST set "DOCKER_HOST=%ORIGINAL_DOCKER_HOST%"
 echo ERROR: Docker Engine is not reachable or API negotiation failed.
-echo Try restarting Docker Desktop, then run: docker version
-docker version
+echo This is a Docker Desktop engine/proxy problem if /version returns HTTP 500.
+echo Run: scripts\docker-diagnose.bat
+echo Then restart Docker Desktop and run: wsl --shutdown
+exit /b 1
+
+:probe_docker_api_versions
+for %%A in (1.53 1.52 1.51 1.50 1.49 1.48 1.47 1.46 1.45 1.44 1.43 1.42 1.41) do (
+  set "DOCKER_API_VERSION=%%A"
+  for /f "delims=" %%V in ('docker version --format "{{.Server.APIVersion}}" 2^>NUL') do set "SERVER_DOCKER_API_VERSION=%%V"
+  if defined SERVER_DOCKER_API_VERSION (
+    set "PINNED_DOCKER_API_VERSION=%%A"
+    exit /b 0
+  )
+)
 exit /b 1

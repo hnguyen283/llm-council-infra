@@ -117,7 +117,7 @@ services:
       ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
       AUTH_GOOGLE_CLIENT_ID:          ${AUTH_GOOGLE_CLIENT_ID:-}
       AUTH_GOOGLE_ALLOWED_DOMAINS:    ${AUTH_GOOGLE_ALLOWED_DOMAINS:-}
-      AUTH_GOOGLE_SIGNUP_SECRET:      ${AUTH_GOOGLE_SIGNUP_SECRET}
+      AUTH_GOOGLE_SIGNUP_SECRET:      ${AUTH_GOOGLE_SIGNUP_SECRET:-}
     depends_on:
       account-service: { condition: service_started }
     healthcheck:
