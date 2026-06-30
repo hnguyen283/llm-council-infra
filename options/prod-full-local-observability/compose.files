@@ -1,0 +1,5 @@
+compose/compose.yaml
+compose/compose.prod.yaml
+compose/compose.ui-nginx.yaml
+compose/compose.edge-http.yaml
+compose/compose.local-observability.yaml

@@ -3,12 +3,18 @@
 .env.*
 .env.local
 prod-lite.env
+env/workspace.env
+env/local.user.override.env
+secrets/local/
 
 # Local TLS material
 ssl/
 *.pem
 *.key
 *.p12
+
+# Generated diagnostics
+.generated/
 
 # Logs
 *.log

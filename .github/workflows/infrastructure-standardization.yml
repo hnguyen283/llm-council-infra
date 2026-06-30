@@ -1,0 +1,26 @@
+name: infrastructure-standardization
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  render-options:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        option:
+          - dev-full-http
+          - dev-local-ai
+          - prod-full-local-http
+          - prod-full-local-https
+          - prod-full-local-https-tunnel
+          - prod-full-local-observability
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render Compose option
+        run: sh scripts/config.sh "${{ matrix.option }}"
+      - name: Check environment contract
+        run: sh scripts/check-env.sh

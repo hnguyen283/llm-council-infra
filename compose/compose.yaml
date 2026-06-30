@@ -1,0 +1,15 @@
+name: llm-council-standard
+
+# Canonical pre-BP1.75 Compose entry point.
+#
+# The service definitions are included from the proven tier files while the
+# semantic option model owns file ordering, env layering, edge mode, and
+# optional capabilities. This keeps one canonical application model without
+# duplicating every service definition in a second full-stack Compose file.
+include:
+  - ../projects/data/docker-compose.yml
+  - ../projects/messaging/docker-compose.yml
+  - ../projects/ai-runtime/docker-compose.yml
+  - ../projects/observability/docker-compose.yml
+  - ../projects/platform/docker-compose.yml
+  - ../projects/core/docker-compose.yml

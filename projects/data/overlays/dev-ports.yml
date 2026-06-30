@@ -1,5 +1,5 @@
 # Development host ports for the data tier.
-# Use only with dev.cmd / IDE workflows.
+# Use only with dev-full-http / IDE workflows.
 services:
   postgres:
     ports: ["${LOCAL_PG_HOST_BIND:-127.0.0.1}:5432:5432"]

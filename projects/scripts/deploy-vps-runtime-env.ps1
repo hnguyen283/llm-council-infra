@@ -28,8 +28,8 @@ if (-not $HostInfoPath) {
     $HostInfoPath = Join-Path $ProjectRoot "hostInfo.txt"
 }
 if (-not $EnvPath) {
-    # Default fallback: check if we have option 4 env file, else use root.
-    $opt4Env = Join-Path $InfraRoot "start\4-prod-lite-vps\.env"
+    # Default fallback: check the semantic VPS option env file, else use root.
+    $opt4Env = Join-Path $InfraRoot "options\prod-lite-vps\.env"
     if (Test-Path -LiteralPath $opt4Env) {
         $EnvPath = $opt4Env
     } else {
@@ -418,7 +418,7 @@ Copy-InfraPath "projects\core\overlays\prod-lite.yml" $staging
 Copy-InfraPath "projects\core\overlays\log-files.yml" $staging
 Copy-InfraPath "projects\graphrag\docker-compose.yml" $staging
 Copy-InfraPath "projects\graphrag\overlays\log-files.yml" $staging
-Copy-Item -LiteralPath (Join-Path $InfraRoot "start\4-prod-lite-vps\prod-lite.sh") -Destination (Join-Path $staging "prod-lite.sh") -Force
+Copy-Item -LiteralPath (Join-Path $InfraRoot "scripts\prod-lite.sh") -Destination (Join-Path $staging "prod-lite.sh") -Force
 Copy-RelativePath "config-repo" $staging
 Copy-InfraPath "infra\postgres\Dockerfile" $staging
 Copy-InfraPath "infra\postgres\initdb" $staging

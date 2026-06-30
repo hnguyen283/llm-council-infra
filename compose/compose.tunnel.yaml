@@ -1,0 +1,9 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.6.0
+    profiles: [tunnel]
+    networks: [llm-council-app]
+    depends_on:
+      portal-edge: { condition: service_healthy }
+    command: tunnel --no-autoupdate --url http://portal-edge:${EDGE_CONTAINER_PORT:-8443}
+    restart: unless-stopped

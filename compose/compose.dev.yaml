@@ -1,0 +1,5 @@
+include:
+  - ../projects/data/overlays/dev-ports.yml
+  - ../projects/messaging/overlays/dev-ports.yml
+  - ../projects/observability/overlays/dev-ports.yml
+  - ../projects/platform/overlays/dev-ports.yml

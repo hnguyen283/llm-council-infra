@@ -1,0 +1,22 @@
+services:
+  portal-edge:
+    image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/portal-edge:${IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: llm-council-infra/edge/nginx/Dockerfile
+    networks: [llm-council-app]
+    depends_on:
+      api-gateway: { condition: service_healthy }
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      API_BASE_PATH: /api
+      AUTH_BASE_PATH: /auth
+      RELEASE_LABEL: ${OPTION_NAME:-prod-full-local}
+      EDGE_CONTAINER_PORT: ${EDGE_CONTAINER_PORT:-8080}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${EDGE_CONTAINER_PORT:-8080}/ >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
+    restart: unless-stopped

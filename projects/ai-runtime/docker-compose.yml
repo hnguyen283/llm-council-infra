@@ -14,7 +14,7 @@ name: llm-council-ai-runtime
 # First-run bootstrap (once per fresh ollama-data volume):
 #   docker compose exec ollama ollama pull deepseek-r1:7b
 #   docker compose exec ollama ollama create planner -f /Modelfile.planner
-# dev-ai.cmd at the repo root automates both steps.
+# scripts/start.* automates both steps for the dev-local-ai option.
 # ============================================================================
 
 networks:

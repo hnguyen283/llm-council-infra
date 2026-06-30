@@ -35,22 +35,22 @@ declared `external: true` in every project that joins them.
 Cross-project `depends_on` is NOT supported by Compose; the orchestrator scripts
 poll each project's healthchecks with `up -d --wait` between stages.
 
-## Orchestrator Scripts (start/ Directory)
+## Semantic Options
 
-All startup and deployment entrypoints are organized under the [`start/`](../start/) folder to isolate configurations:
+All startup and deployment entrypoints are organized through semantic manifests
+under [`options/`](../options/) and shared wrappers under [`scripts/`](../scripts/):
 
-| Option | Directory | Key Script(s) | Purpose |
-| :--- | :--- | :--- | :--- |
-| **1** | [`start/1-dev-local/`](../start/1-dev-local/) | `dev.cmd`, `dev-ai.cmd` | Local Development: Starts postgres/valkey/kafka/zipkin/discovery in Docker while you run Java services in your IDE. `dev-ai.cmd` starts Ollama and local observability (AGE Viewer, Arize Phoenix). |
-| **2** | [`start/2-staging-local/`](../start/2-staging-local/) | `prod-overlays.cmd` | Local Staging: Starts the full production topology locally in Docker with loopback observability overlays (Zipkin, Prometheus, VictoriaLogs, Alloy, AGE Viewer, Phoenix). |
-| **3** | [`start/3-prod-full-local/`](../start/3-prod-full-local/) | `prod.cmd` | Local Production: Starts the full split-production topology locally with only `api-gateway` port 8080 exposed. |
-| **4** | [`start/4-prod-lite-vps/`](../start/4-prod-lite-vps/) | `deploy-vps.cmd` | VPS Deployment: Builds and deploys the core platform stack to a remote VPS server. |
-| **5** | [`start/5-prod-lite-vps-hybrid/`](../start/5-prod-lite-vps-hybrid/) | `deploy-vps.cmd`, `laptop-local-ai.cmd` | VPS Hybrid: Deploys core services to the VPS, while running heavy AI workloads, local database, and admin UI on your local laptop. |
+| Option | Command | Purpose |
+| :--- | :--- | :--- |
+| `dev-full-http` | `scripts\start.bat dev-full-http` | Full Docker-managed local development stack. |
+| `dev-local-ai` | `scripts\start.bat dev-local-ai` | Ollama and local observability for IDE-hosted `local-ai-service`. |
+| `prod-full-local-http` | `scripts\start.bat prod-full-local-http` | Production-like local HTTP stack. |
+| `prod-full-local-observability` | `scripts\start.bat prod-full-local-observability` | Production-like local stack with loopback observability and log-file overlays. |
+| `prod-lite-vps` | `scripts\deploy-vps.bat prod-lite-vps` | Builds and deploys the core platform stack to a remote VPS server. |
+| `prod-lite-vps-hybrid` | `scripts\deploy-vps.bat prod-lite-vps-hybrid` and `scripts\laptop-local-ai.bat prod-lite-vps-hybrid` | Deploys core services to the VPS while running heavy AI workloads locally. |
 
-Each script automatically sets the current working directory to the repository root before executing, ensuring relative paths in Compose files and Maven build contexts resolve correctly.
-The prod scripts run `docker info` before touching networks or Compose
-projects, so a stopped Docker Desktop or bad Docker context fails fast with an
-actionable message.
+Each script sets paths relative to the infrastructure repository before
+executing, ensuring Compose files and Maven build contexts resolve consistently.
 
 ## Targeted operations
 

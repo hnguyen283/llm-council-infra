@@ -7,7 +7,7 @@ name: llm-council-data
 # either store also join this network (see projects/core/).
 #
 # Run from this directory or pass -f explicitly. The orchestrator scripts at
-# the repo root (prod.cmd, dev.cmd) pass --env-file pointing at the root .env.
+# the semantic scripts pass --env-file layers from llm-council-infra/env and options/.
 # ============================================================================
 
 networks:

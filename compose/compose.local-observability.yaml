@@ -1,0 +1,7 @@
+include:
+  - ../projects/observability/overlays/local-observability.yml
+  - ../projects/observability/docker-compose.local.yml
+  - ../projects/platform/overlays/log-files.yml
+  - ../projects/core/overlays/log-files.yml
+  - ../projects/graphrag/docker-compose.yml
+  - ../projects/graphrag/overlays/log-files.yml

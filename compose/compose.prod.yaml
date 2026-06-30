@@ -1,0 +1,67 @@
+# Production runtime defaults that do not publish api-gateway directly.
+# The public browser edge is provided by compose.ui-nginx.yaml plus an
+# HTTP/HTTPS edge override.
+
+x-jvm-prod: &jvm-prod
+  JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
+  LANG: "C.UTF-8"
+  LC_ALL: "C.UTF-8"
+
+services:
+  zipkin:
+    restart: unless-stopped
+  prometheus:
+    restart: unless-stopped
+  victorialogs:
+    restart: unless-stopped
+  alloy:
+    restart: unless-stopped
+
+  config-server:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      CONFIG_REPO_PATH: file:/config-repo
+  discovery-server:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+
+  api-gateway:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+  auth-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      AUTH_CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+  account-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      SPRING_PROFILES_ACTIVE: docker,prod
+      ACCOUNT_INTERNAL_AUTH_ENABLED: "true"
+  orchestrator-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+      ORCHESTRATOR_JOB_STORE: valkey
+  gemini-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+  gpt-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+  prompt-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod
+  local-ai-service:
+    restart: unless-stopped
+    environment:
+      <<: *jvm-prod

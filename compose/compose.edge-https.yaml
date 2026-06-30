@@ -1,0 +1,16 @@
+services:
+  portal-edge:
+    ports:
+      - "${PUBLIC_HOST_BIND:-127.0.0.1}:${PUBLIC_PORT:-8443}:8443"
+    environment:
+      EDGE_CONTAINER_PORT: 8443
+      EDGE_FORWARDED_PROTO: https
+    volumes:
+      - ../edge/nginx/conf.d/site.https.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${HTTPS_CERT_DIR:-../ssl}:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-check-certificate -qO- https://127.0.0.1:8443/ >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 10s

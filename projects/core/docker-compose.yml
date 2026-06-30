@@ -14,7 +14,7 @@ name: llm-council-core
 #   ai-runtime     — local-ai-service only (talks to ollama)
 #
 # Cross-project depends_on is NOT supported by Compose. The orchestrator
-# scripts at the repo root (prod.cmd, prod-local-obs.cmd) gate cross-project
+# scripts/start.* gates cross-project
 # ordering by polling health endpoints between project boots. Within this
 # project, depends_on with health conditions still works.
 #

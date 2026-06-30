@@ -1,0 +1,4 @@
+include:
+  - ../projects/ai-runtime/docker-compose.yml
+  - ../projects/ai-runtime/overlays/dev-ports.yml
+  - ../projects/observability/docker-compose.local.yml
