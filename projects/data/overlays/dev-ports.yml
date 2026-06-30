@@ -2,6 +2,6 @@
 # Use only with dev.cmd / IDE workflows.
 services:
   postgres:
-    ports: ["5432:5432"]
+    ports: ["${LOCAL_PG_HOST_BIND:-127.0.0.1}:5432:5432"]
   valkey:
-    ports: ["6379:6379"]
+    ports: ["${LOCAL_VALKEY_HOST_BIND:-127.0.0.1}:6379:6379"]

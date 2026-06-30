@@ -49,7 +49,7 @@ volumes:
 services:
 
   zipkin:
-    image: openzipkin/zipkin:3@sha256:d17e856dcbba7ffeefbbfc252f89ab78a4ab6faed47e646d46daad78f91b5ee2
+    image: ghcr.io/openzipkin-contrib/zipkin-otel:0.3.0@sha256:097c7d44b1481857fa7ce8ce4dc6548fec672a48bc23901d6bff9ae0f15dc56d
     networks: [llm-council-observability]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9411/health >/dev/null 2>&1"]

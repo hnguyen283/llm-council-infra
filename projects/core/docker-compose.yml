@@ -39,7 +39,9 @@ x-jvm-common: &jvm-common
   JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8"
   LANG: "C.UTF-8"
   LC_ALL: "C.UTF-8"
-  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+  # The Zipkin OTEL distribution accepts OTLP/HTTP on its server port. Remote deployments can
+  # override this with a collector endpoint in their environment file.
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://zipkin:9411}
 
 services:
 
