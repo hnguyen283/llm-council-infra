@@ -107,6 +107,21 @@ else
   (cd "$ROOT/../llm-council" && mvn -DskipTests package)
 fi
 
+if docker compose -f "$GENERATED" config --services | grep -qx postgres; then
+  echo "=== [start] Starting Postgres before database clients ==="
+  set +e
+  docker compose -f "$GENERATED" up -d --build --wait --wait-timeout "$START_WAIT_TIMEOUT_SECONDS" postgres
+  postgres_exit=$?
+  set -e
+  if [ "$postgres_exit" -ne 0 ]; then
+    dump_start_failure "$GENERATED"
+    exit "$postgres_exit"
+  fi
+
+  echo "=== [start] Reconciling Postgres roles with current environment ==="
+  docker compose -f "$GENERATED" exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
+fi
+
 echo "=== [start] Starting $OPTION from rendered Compose config ==="
 set +e
 docker compose -f "$GENERATED" up -d --build --wait --wait-timeout "$START_WAIT_TIMEOUT_SECONDS"
@@ -115,11 +130,6 @@ set -e
 if [ "$start_exit" -ne 0 ]; then
   dump_start_failure "$GENERATED"
   exit "$start_exit"
-fi
-
-if docker compose -f "$GENERATED" ps postgres >/dev/null 2>&1; then
-  echo "=== [start] Applying idempotent Postgres bootstrap ==="
-  docker compose -f "$GENERATED" exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
 fi
 
 if [ "$LOCAL_AI_PREPARE_MODEL" = "true" ]; then

@@ -7,7 +7,11 @@
 x-prod-lite-spring-env: &prod-lite-spring-env
   JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8 -Dsun.jnu.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -XX:MaxRAMPercentage=70.0"
   MANAGEMENT_TRACING_ENABLED: "false"
+  MANAGEMENT_TRACING_EXPORT_ENABLED: "false"
   MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "0.0"
+  OBSERVABILITY_ENABLED: "false"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
+  OTEL_SDK_DISABLED: "true"
 
 services:
   zipkin:
@@ -131,7 +135,10 @@ services:
     environment:
       GRPC_MAX_WORKERS: ${GRPC_MAX_WORKERS:-2}
       INGESTION_MAX_RETRIES: ${INGESTION_MAX_RETRIES:-2}
+      PRODUCTION: "true"
+      OBSERVABILITY_ENABLED: "false"
       OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      OTEL_SDK_DISABLED: "true"
 
   graphrag-indexing-worker:
     mem_limit: 512m
@@ -144,7 +151,10 @@ services:
     environment:
       GRPC_MAX_WORKERS: ${GRPC_MAX_WORKERS:-2}
       INGESTION_MAX_RETRIES: ${INGESTION_MAX_RETRIES:-2}
+      PRODUCTION: "true"
+      OBSERVABILITY_ENABLED: "false"
       OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      OTEL_SDK_DISABLED: "true"
 
   portal-edge:
     mem_limit: 128m

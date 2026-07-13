@@ -68,19 +68,30 @@ if /I not "%OPTION_KIND%"=="local-ai-runtime" (
 )
 
 echo.
+set "HAS_POSTGRES="
+for /f "delims=" %%S in ('docker compose -f "%GENERATED%" config --services') do (
+  if /I "%%S"=="postgres" set "HAS_POSTGRES=true"
+)
+if defined HAS_POSTGRES (
+  echo === [start] Starting Postgres before database clients ===
+  docker compose -f "%GENERATED%" up -d --build --wait --wait-timeout %START_WAIT_TIMEOUT_SECONDS% postgres
+  if errorlevel 1 (
+    call :dump_start_failure "%GENERATED%"
+    exit /b 1
+  )
+
+  echo.
+  echo === [start] Reconciling Postgres roles with current environment ===
+  docker compose -f "%GENERATED%" exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
+  if errorlevel 1 exit /b 1
+)
+
+echo.
 echo === [start] Starting %OPTION% from rendered Compose config ===
 docker compose -f "%GENERATED%" up -d --build --wait --wait-timeout %START_WAIT_TIMEOUT_SECONDS%
 if errorlevel 1 (
   call :dump_start_failure "%GENERATED%"
   exit /b 1
-)
-
-docker compose -f "%GENERATED%" ps postgres >NUL 2>&1
-if not errorlevel 1 (
-  echo.
-  echo === [start] Applying idempotent Postgres bootstrap ===
-  docker compose -f "%GENERATED%" exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
-  if errorlevel 1 exit /b 1
 )
 
 if /I "%LOCAL_AI_PREPARE_MODEL%"=="true" (

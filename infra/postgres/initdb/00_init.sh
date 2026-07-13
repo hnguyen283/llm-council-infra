@@ -2,7 +2,9 @@
 # ============================================================================
 # Postgres initdb hook.
 #
-# Runs once on first container start (when /var/lib/postgresql/data is empty).
+# Runs on first database initialization and is rerun by scripts/start.* before
+# database clients start. Reapplying it rotates role passwords from the current
+# environment while preserving all existing database data.
 # Creates the least-privilege application roles used by:
 #   - account-service  (account schema, identity model)
 #   - prompt-service   (prompt  schema, Standardized Prompt registry)
