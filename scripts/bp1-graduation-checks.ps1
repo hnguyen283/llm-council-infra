@@ -1,5 +1,6 @@
 param(
-  [string]$RepoRoot
+  [string]$RepoRoot,
+  [string]$EvidenceRoot
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +26,106 @@ function Fail($message) {
 function Pending($message) {
   $script:pending.Add($message) | Out-Null
   Write-Host "PENDING: $message"
+}
+
+function Resolve-EvidenceDirectory([string]$configuredRoot) {
+  if ($configuredRoot -and $configuredRoot.Trim() -ne "") {
+    $candidate = if ([System.IO.Path]::IsPathRooted($configuredRoot)) {
+      $configuredRoot
+    } else {
+      Join-Path $RepoRoot $configuredRoot
+    }
+    if (-not (Test-Path -LiteralPath $candidate -PathType Container)) {
+      Pending "BP1 runtime evidence root does not exist: $candidate"
+      return $null
+    }
+    return (Resolve-Path -LiteralPath $candidate).Path
+  }
+
+  $roadmapRoot = Join-Path $RepoRoot "reports\architecture-roadmap"
+  if (-not (Test-Path -LiteralPath $roadmapRoot -PathType Container)) {
+    Pending "BP1 architecture-roadmap evidence root does not exist yet."
+    return $null
+  }
+
+  $matches = @(Get-ChildItem -LiteralPath $roadmapRoot `
+      -Filter "runtime-graduation-complete.md" -File -Recurse |
+    Where-Object {
+      $_.DirectoryName -match "[\\/]\d{4}-\d{2}-\d{2}[\\/]\d{2}[\\/]evidence$"
+    } |
+    Sort-Object FullName -Descending)
+  if ($matches.Count -eq 0) {
+    Pending "BP1 runtime graduation evidence is not attached yet."
+    return $null
+  }
+  return $matches[0].DirectoryName
+}
+
+function Validate-RuntimeGraduationEvidence([string]$resolvedRoot) {
+  if (-not $resolvedRoot) {
+    return
+  }
+
+  $evidencePath = Join-Path $resolvedRoot "runtime-graduation-complete.md"
+  if (-not (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
+    Pending "BP1 runtime graduation evidence is not attached at $resolvedRoot."
+    return
+  }
+
+  $content = Get-Content -Raw -LiteralPath $evidencePath
+  $requirements = @(
+    @{
+      Pattern = "(?im)^\s*(?:[-*]\s*)?(?:\*\*)?(?:result|status)(?:\*\*)?\s*:\s*(?:\*\*)?pass(?:\*\*)?\s*$"
+      Message = "does not declare Result: PASS"
+    },
+    @{
+      Pattern = "(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b"
+      Message = "does not include a runtime job ID"
+    },
+    @{
+      Pattern = "(?i)shadow"
+      Message = "does not include a shadow job/evidence reference"
+    },
+    @{
+      Pattern = "(?i)canaryEligible\s*[:=]\s*true"
+      Message = "does not include canaryEligible=true"
+    },
+    @{
+      Pattern = "(?im)^.*KnowledgeRetrieval.*(?:PASS|passed).*$"
+      Message = "does not include passing KnowledgeRetrieval evidence"
+    },
+    @{
+      Pattern = "(?im)^.*(?:actuator/health|edge health).*(?:UP|PASS|passed|HTTP\s*200).*$"
+      Message = "does not include passing public-edge health evidence"
+    },
+    @{
+      Pattern = "(?im)^.*(?:artifact|claim-check).*(?:PASS|passed|verified).*$"
+      Message = "does not include passing artifact/claim-check evidence"
+    },
+    @{
+      Pattern = "(?im)^.*(?:leak|sensitive-data).*(?:PASS|passed|no\s+(?:leak|raw)).*$"
+      Message = "does not include a passing sensitive-data leak scan"
+    },
+    @{
+      Pattern = "(?im)^.*rollback.*(?:PASS|passed|restored).*$"
+      Message = "does not include passing rollback evidence"
+    },
+    @{
+      Pattern = "(?i)no required check was skipped"
+      Message = "does not state that no required check was skipped"
+    }
+  )
+
+  $invalid = $false
+  foreach ($requirement in $requirements) {
+    if ($content -notmatch $requirement.Pattern) {
+      Pending "BP1 runtime evidence $($requirement.Message)."
+      $invalid = $true
+    }
+  }
+  if (-not $invalid) {
+    Pass "BP1 runtime graduation evidence is valid at $evidencePath"
+  }
 }
 
 function Require-File($relativePath) {
@@ -124,12 +225,8 @@ foreach ($test in @(
   [void](Require-File $test)
 }
 
-$evidenceRoot = Join-Path $RepoRoot "reports\architecture-roadmap\2026-07-12\02\evidence"
-if (Test-Path (Join-Path $evidenceRoot "runtime-graduation-complete.md")) {
-  Pass "BP1 runtime graduation evidence is attached"
-} else {
-  Pending "BP1 runtime graduation evidence is not attached yet."
-}
+$resolvedEvidenceRoot = Resolve-EvidenceDirectory $EvidenceRoot
+Validate-RuntimeGraduationEvidence $resolvedEvidenceRoot
 
 Write-Host ""
 Write-Host "=== BP1 static graduation summary ==="

@@ -169,6 +169,8 @@ services:
       VALKEY_HOST:       valkey
       VALKEY_PORT:       "6379"
       VALKEY_PASSWORD:   ${VALKEY_PASSWORD}
+      VALKEY_COMMAND_TIMEOUT_MS: ${VALKEY_COMMAND_TIMEOUT_MS:-200}
+      VALKEY_CONNECT_TIMEOUT_MS: ${VALKEY_CONNECT_TIMEOUT_MS:-200}
       STANDARDIZED_PROMPT_ENABLED:           ${STANDARDIZED_PROMPT_ENABLED:-false}
       STANDARDIZED_PROMPT_SHADOW_ENABLED:    ${STANDARDIZED_PROMPT_SHADOW_ENABLED:-false}
       STANDARDIZED_PROMPT_FAIL_CLOSED:       ${STANDARDIZED_PROMPT_FAIL_CLOSED:-false}
@@ -245,6 +247,8 @@ services:
       DB_URL:      jdbc:postgresql://postgres:5432/${POSTGRES_DB:-llm_council}
       DB_USER:     ${PROMPT_DB_USER:-prompt_app}
       DB_PASSWORD: ${PROMPT_DB_PASSWORD}
+      ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
+      PROMPT_ACCOUNT_SERVICE_URI: http://account-service:8087
     depends_on:
       api-gateway: { condition: service_healthy }
     healthcheck:
