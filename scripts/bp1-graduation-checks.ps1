@@ -246,5 +246,9 @@ if ($failures.Count -gt 0) {
   exit 1
 }
 
-Write-Host "BP1 static checks passed. BP1 is not graduated while pending gates remain."
+if ($pending.Count -gt 0) {
+  Write-Host "BP1 static checks passed. BP1 is not graduated while pending gates remain."
+} else {
+  Write-Host "BP1 graduation checks passed. BP1 is graduated."
+}
 exit 0
