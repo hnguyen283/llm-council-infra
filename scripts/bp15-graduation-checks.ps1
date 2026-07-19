@@ -1,6 +1,7 @@
 param(
   [string]$RepoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path,
-  [string]$ComposeFile = "$PSScriptRoot\..\.generated\prod-lite-local\compose.resolved.yaml"
+  [Alias("ComposeFile")]
+  [string]$ComposeFileList = "$PSScriptRoot\..\.generated\prod-lite-local\compose.files.txt"
 )
 
 $ErrorActionPreference = "Stop"
@@ -83,15 +84,40 @@ foreach ($file in $locatorProducerFiles) {
   }
 }
 
-if (Test-Path -LiteralPath $ComposeFile) {
-  docker compose -f $ComposeFile config --quiet
+if (Test-Path -LiteralPath $ComposeFileList) {
+  $generatedDirectory = Split-Path -Parent $ComposeFileList
+  $infraRoot = (Resolve-Path "$PSScriptRoot\..").Path
+  $composeArgs = @()
+  $environmentLayersFile = Join-Path $generatedDirectory "environment.layers.txt"
+  if (Test-Path -LiteralPath $environmentLayersFile) {
+    foreach ($relativePath in Get-Content -LiteralPath $environmentLayersFile) {
+      if (-not [string]::IsNullOrWhiteSpace($relativePath)) {
+        $composeArgs += @("--env-file", (Join-Path $infraRoot $relativePath))
+      }
+    }
+  }
+  foreach ($relativePath in Get-Content -LiteralPath $ComposeFileList) {
+    if (-not [string]::IsNullOrWhiteSpace($relativePath)) {
+      $composeArgs += @("-f", (Join-Path $infraRoot $relativePath))
+    }
+  }
+  $profilesFile = Join-Path $generatedDirectory "profiles.txt"
+  if (Test-Path -LiteralPath $profilesFile) {
+    foreach ($profile in Get-Content -LiteralPath $profilesFile) {
+      if (-not [string]::IsNullOrWhiteSpace($profile)) {
+        $composeArgs += @("--profile", $profile)
+      }
+    }
+  }
+  $composeArgs += @("config", "--quiet")
+  docker compose @composeArgs
   if ($LASTEXITCODE -ne 0) {
-    Fail "docker compose config --quiet failed for $ComposeFile"
+    Fail "docker compose config --quiet failed for the generated option file list"
   } else {
-    Pass "docker compose config --quiet passed for $ComposeFile"
+    Pass "docker compose config --quiet passed for the generated option file list"
   }
 } else {
-  Fail "Rendered prod-lite compose file not found; run scripts\config.bat prod-lite-local first"
+  Fail "Generated prod-lite Compose file list not found; run scripts\config.bat prod-lite-local first"
 }
 
 if ($failed) {

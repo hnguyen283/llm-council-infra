@@ -13,11 +13,13 @@ jobs:
       matrix:
         option:
           - dev-full-http
+          - dev-full-https
           - dev-local-ai
           - prod-full-local-http
           - prod-full-local-https
           - prod-full-local-https-tunnel
           - prod-full-local-observability
+          - prod-lite-local
     steps:
       - uses: actions/checkout@v4
       - name: Render Compose option

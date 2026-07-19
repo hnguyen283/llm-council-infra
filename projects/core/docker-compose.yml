@@ -51,6 +51,8 @@ services:
     networks: [llm-council-data, llm-council-observability, llm-council-platform, llm-council-app]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ../../secrets/local/api-gateway:/run/secrets/api-gateway:ro
     environment:
       <<: *jvm-common
       SPRING_PROFILES_ACTIVE: docker
@@ -78,6 +80,8 @@ services:
       GATEWAY_INTERNAL_TTL_SECONDS:     ${GATEWAY_INTERNAL_TTL_SECONDS:-300}
       GATEWAY_INTERNAL_PRIVATE_KEY_PEM: ${GATEWAY_INTERNAL_PRIVATE_KEY_PEM}
       GATEWAY_INTERNAL_PUBLIC_KEYS_PEM: ${GATEWAY_INTERNAL_PUBLIC_KEYS_PEM}
+      GATEWAY_INTERNAL_PRIVATE_KEY_PEM_FILE: /run/secrets/api-gateway/private-key.pem
+      GATEWAY_INTERNAL_PUBLIC_KEYS_PEM_FILE: /run/secrets/api-gateway/public-keys.pem
       ACCOUNT_SERVICE_URL:              http://account-service:8087
       ACCOUNT_INTERNAL_SERVICE_TOKEN:   ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
     healthcheck:

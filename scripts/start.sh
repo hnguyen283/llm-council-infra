@@ -2,6 +2,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CR=$(printf '\r')
 OPTION=${1:-prod-full-local-http}
 DRY_RUN=${2:-}
 OPTION_DIR="$ROOT/options/$OPTION"
@@ -18,6 +19,7 @@ LOCAL_AI_PREPARE_MODEL=false
 LOCAL_AI_BASE_MODEL=deepseek-r1:7b
 LOCAL_AI_MODEL=planner
 while IFS='=' read -r key value || [ -n "$key" ]; do
+  value=${value%"$CR"}
   case "$key" in
     OPTION_KIND) OPTION_KIND=$value ;;
     LOCAL_AI_PREPARE_MODEL) LOCAL_AI_PREPARE_MODEL=$value ;;
@@ -28,11 +30,35 @@ done < "$OPTION_DIR/option.env"
 
 "$ROOT/scripts/config.sh" "$OPTION"
 
-GENERATED="$ROOT/.generated/$OPTION/compose.resolved.yaml"
+GENERATED_DIR="$ROOT/.generated/$OPTION"
 if [ "$DRY_RUN" = "--dry-run" ]; then
-  echo "Dry run complete. Rendered config: $GENERATED"
+  echo "Dry run complete. Safe diagnostics: $GENERATED_DIR"
   exit 0
 fi
+
+RUNTIME_ENV_ARGS=""
+while IFS= read -r rel || [ -n "$rel" ]; do
+  rel=${rel%"$CR"}
+  [ -n "$rel" ] || continue
+  RUNTIME_ENV_ARGS="$RUNTIME_ENV_ARGS --env-file $ROOT/$rel"
+done < "$ROOT/.generated/$OPTION/environment.layers.txt"
+RUNTIME_FILE_ARGS=""
+while IFS= read -r rel || [ -n "$rel" ]; do
+  rel=${rel%"$CR"}
+  [ -n "$rel" ] || continue
+  RUNTIME_FILE_ARGS="$RUNTIME_FILE_ARGS -f $ROOT/$rel"
+done < "$ROOT/.generated/$OPTION/compose.files.txt"
+RUNTIME_PROFILE_ARGS=""
+while IFS= read -r profile || [ -n "$profile" ]; do
+  profile=${profile%"$CR"}
+  [ -n "$profile" ] || continue
+  RUNTIME_PROFILE_ARGS="$RUNTIME_PROFILE_ARGS --profile $profile"
+done < "$ROOT/.generated/$OPTION/profiles.txt"
+
+compose_runtime() {
+  # shellcheck disable=SC2086
+  docker compose $RUNTIME_ENV_ARGS $RUNTIME_FILE_ARGS $RUNTIME_PROFILE_ARGS "$@"
+}
 
 pin_docker_api_version() {
   original=${DOCKER_API_VERSION:-}
@@ -63,19 +89,18 @@ pin_docker_api_version() {
 pin_docker_api_version
 
 dump_start_failure() {
-  compose_config=$1
   echo
   echo "=== [start] Startup failed; targeted diagnostics follow ==="
   echo "Compose services:"
-  docker compose -f "$compose_config" ps || true
+  compose_runtime ps || true
   for service in api-gateway auth-service account-service config-server discovery-server valkey postgres; do
     echo
     echo "--- $service status ---"
-    docker compose -f "$compose_config" ps "$service" || true
+    compose_runtime ps "$service" || true
     echo "--- $service logs (tail 160) ---"
-    docker compose -f "$compose_config" logs --tail=160 "$service" || true
+    compose_runtime logs --tail=160 "$service" || true
   done
-  gateway_container=$(docker compose -f "$compose_config" ps -q api-gateway 2>/dev/null || true)
+  gateway_container=$(compose_runtime ps -q api-gateway 2>/dev/null || true)
   if [ -n "$gateway_container" ]; then
     echo
     echo "--- api-gateway Docker health state ---"
@@ -107,35 +132,35 @@ else
   (cd "$ROOT/../llm-council" && mvn -DskipTests package)
 fi
 
-if docker compose -f "$GENERATED" config --services | grep -qx postgres; then
+if compose_runtime config --services | grep -qx postgres; then
   echo "=== [start] Starting Postgres before database clients ==="
   set +e
-  docker compose -f "$GENERATED" up -d --build --wait --wait-timeout "$START_WAIT_TIMEOUT_SECONDS" postgres
+  compose_runtime up -d --build --wait --wait-timeout "$START_WAIT_TIMEOUT_SECONDS" postgres
   postgres_exit=$?
   set -e
   if [ "$postgres_exit" -ne 0 ]; then
-    dump_start_failure "$GENERATED"
+    dump_start_failure
     exit "$postgres_exit"
   fi
 
   echo "=== [start] Reconciling Postgres roles with current environment ==="
-  docker compose -f "$GENERATED" exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
+  compose_runtime exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
 fi
 
-echo "=== [start] Starting $OPTION from rendered Compose config ==="
+echo "=== [start] Starting $OPTION from the validated semantic Compose files ==="
 set +e
-docker compose -f "$GENERATED" up -d --build --wait --wait-timeout "$START_WAIT_TIMEOUT_SECONDS"
+compose_runtime up -d --build --wait --wait-timeout "$START_WAIT_TIMEOUT_SECONDS"
 start_exit=$?
 set -e
 if [ "$start_exit" -ne 0 ]; then
-  dump_start_failure "$GENERATED"
+  dump_start_failure
   exit "$start_exit"
 fi
 
 if [ "$LOCAL_AI_PREPARE_MODEL" = "true" ]; then
   echo "=== [start] Preparing Ollama model $LOCAL_AI_BASE_MODEL and alias $LOCAL_AI_MODEL ==="
-  docker compose -f "$GENERATED" exec ollama ollama pull "$LOCAL_AI_BASE_MODEL"
-  docker compose -f "$GENERATED" exec ollama ollama create "$LOCAL_AI_MODEL" -f /Modelfile.planner
+  compose_runtime exec ollama ollama pull "$LOCAL_AI_BASE_MODEL"
+  compose_runtime exec ollama ollama create "$LOCAL_AI_MODEL" -f /Modelfile.planner
 fi
 
 echo "=== [start] $OPTION is up ==="

@@ -2,6 +2,7 @@
 set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CR=$(printf '\r')
 OPTION=${1:-prod-full-local-http}
 OPTION_DIR="$ROOT/options/$OPTION"
 
@@ -30,6 +31,7 @@ OUT_DIR="$ROOT/.generated/$OPTION"
 mkdir -p "$OUT_DIR"
 
 ENV_ARGS=""
+ENV_LAYER_FILES=""
 ENV_LIST="$OUT_DIR/environment.layers.txt"
 : > "$ENV_LIST"
 add_env() {
@@ -37,6 +39,7 @@ add_env() {
   abs="$ROOT/$rel"
   if [ -f "$abs" ]; then
     ENV_ARGS="$ENV_ARGS --env-file $abs"
+    ENV_LAYER_FILES="$ENV_LAYER_FILES $abs"
     echo "$rel" >> "$ENV_LIST"
   fi
 }
@@ -51,6 +54,7 @@ FILE_ARGS=""
 FILE_LIST="$OUT_DIR/compose.files.txt"
 : > "$FILE_LIST"
 while IFS= read -r line || [ -n "$line" ]; do
+  line=${line%"$CR"}
   case "$line" in
     ""|\#*) continue ;;
   esac
@@ -67,6 +71,7 @@ PROFILE_ARGS=""
 PROFILE_LIST="$OUT_DIR/profiles.txt"
 : > "$PROFILE_LIST"
 while IFS= read -r profile || [ -n "$profile" ]; do
+  profile=${profile%"$CR"}
   case "$profile" in
     ""|\#*) continue ;;
   esac
@@ -85,24 +90,48 @@ cat "$PROFILE_LIST"
 # shellcheck disable=SC2086
 docker compose $ENV_ARGS $FILE_ARGS $PROFILE_ARGS config --quiet
 # shellcheck disable=SC2086
-docker compose $ENV_ARGS $FILE_ARGS $PROFILE_ARGS config > "$OUT_DIR/compose.resolved.yaml"
+LEGACY_MODEL="$OUT_DIR/compose.resolved.yaml"
+if [ -f "$LEGACY_MODEL" ]; then
+  rm -f -- "$LEGACY_MODEL"
+fi
+# Persist only metadata that cannot contain interpolated secret values. Runtime
+# commands reassemble the validated Compose files from the recorded lists.
+# shellcheck disable=SC2086
+docker compose $ENV_ARGS $FILE_ARGS $PROFILE_ARGS config --services > "$OUT_DIR/compose.services.txt"
 
 ENV_OUT="$OUT_DIR/environment.resolved.txt"
-: > "$ENV_OUT"
-for env_file in "$ROOT/env/defaults.env" "$ROOT/env/workspace.env" "$ROOT/env/modes/$MODE.env" "$OPTION_DIR/option.env" "$OPTION_DIR/.env" "$ROOT/env/local.user.override.env"; do
-  [ -f "$env_file" ] || continue
-  while IFS='=' read -r key value || [ -n "$key" ]; do
-    case "$key" in
-      ""|\#*) continue ;;
-    esac
-    case "$key" in
-      *PASSWORD*|*SECRET*|*TOKEN*|*PRIVATE*|*PEM*|*API_KEY*|*HMAC_KEY*|*SIGNING_KEY*)
-        [ -n "${value:-}" ] && value='***'
-        ;;
-    esac
-    printf '%s=%s\n' "$key" "${value:-}" >> "$ENV_OUT"
-  done < "$env_file"
-done
+# Resolve only declared option-layer keys. Later files and process environment
+# values win, matching Compose interpolation precedence, while secret-like
+# values are masked before anything reaches disk.
+# shellcheck disable=SC2086
+awk '
+  /^[[:space:]]*($|#)/ { next }
+  {
+    separator = index($0, "=")
+    if (separator <= 1) next
+    key = substr($0, 1, separator - 1)
+    value = substr($0, separator + 1)
+    sub(/\r$/, "", value)
+    if (!(key in seen)) {
+      order[++count] = key
+      seen[key] = 1
+    }
+    values[key] = value
+  }
+  END {
+    for (i = 1; i <= count; i++) {
+      key = order[i]
+      value = (key in ENVIRON) ? ENVIRON[key] : values[key]
+      upper = toupper(key)
+      if (upper !~ /(_FILE|_DIR)$/ &&
+          upper ~ /(PASSWORD|SECRET|TOKEN|PRIVATE|PEM|API_KEY|HMAC_KEY|SIGNING_KEY)/ &&
+          value != "") {
+        value = "***"
+      }
+      print key "=" value
+    }
+  }
+' $ENV_LAYER_FILES > "$ENV_OUT"
 
-echo "Rendered Compose config: $OUT_DIR/compose.resolved.yaml"
+echo "Rendered service summary: $OUT_DIR/compose.services.txt"
 echo "Rendered environment summary: $ENV_OUT"

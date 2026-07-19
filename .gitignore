@@ -5,10 +5,13 @@
 prod-lite.env
 env/workspace.env
 env/local.user.override.env
-secrets/local/
+secrets/local/*
+!secrets/local/api-gateway/
+secrets/local/api-gateway/*
+!secrets/local/api-gateway/.gitkeep
 
 # Local TLS material
-ssl/
+ssl*/
 *.pem
 *.key
 *.p12

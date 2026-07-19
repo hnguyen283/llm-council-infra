@@ -1,7 +1,8 @@
 services:
   portal-edge:
     ports:
-      - "${PUBLIC_HOST_BIND:-127.0.0.1}:${PUBLIC_PORT:-8080}:8080"
+      - "${PUBLIC_HOST_BIND:-127.0.0.1}:${EDGE_HTTP_HOST_PORT:-8080}:8080"
     environment:
       EDGE_CONTAINER_PORT: 8080
       EDGE_FORWARDED_PROTO: http
+      EDGE_FORWARDED_PORT: ${EDGE_HTTP_HOST_PORT:-8080}

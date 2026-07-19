@@ -2,8 +2,25 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2026.6.0
     profiles: [tunnel]
-    networks: [llm-council-app]
+    # The remotely managed route currently targets http://localhost:8080.
+    # Sharing the edge network namespace makes that loopback address the
+    # production Nginx origin while keeping the connector outbound-only.
+    network_mode: service:portal-edge
     depends_on:
       portal-edge: { condition: service_healthy }
-    command: tunnel --no-autoupdate --url http://portal-edge:${EDGE_CONTAINER_PORT:-8443}
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:-}
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --loglevel
+      - info
+      - --metrics
+      - 0.0.0.0:2000
+      - run
     restart: unless-stopped
+
+  portal-edge:
+    environment:
+      EDGE_FORWARDED_PROTO: https
+      EDGE_FORWARDED_PORT: 443

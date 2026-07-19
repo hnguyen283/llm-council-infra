@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 
 set "ROOT=%~dp0.."
 if "%~1"=="" (
@@ -40,11 +40,18 @@ echo === [start] Validating semantic option: %OPTION% ===
 call "%ROOT%\scripts\config.bat" "%OPTION%"
 if errorlevel 1 exit /b 1
 
-set "GENERATED=%ROOT%\.generated\%OPTION%\compose.resolved.yaml"
+set "GENERATED_DIR=%ROOT%\.generated\%OPTION%"
 if /I "%DRY_RUN%"=="true" (
-  echo Dry run complete. Rendered config: %GENERATED%
+  echo Dry run complete. Safe diagnostics: %GENERATED_DIR%
   exit /b 0
 )
+
+set "RUNTIME_ENV_ARGS="
+for /f "usebackq tokens=* delims=" %%L in ("%ROOT%\.generated\%OPTION%\environment.layers.txt") do if not "%%L"=="" set "RUNTIME_ENV_ARGS=!RUNTIME_ENV_ARGS! --env-file "%ROOT%\%%L""
+set "RUNTIME_FILE_ARGS="
+for /f "usebackq tokens=* delims=" %%L in ("%ROOT%\.generated\%OPTION%\compose.files.txt") do if not "%%L"=="" set "RUNTIME_FILE_ARGS=!RUNTIME_FILE_ARGS! -f "%ROOT%\%%L""
+set "RUNTIME_PROFILE_ARGS="
+for /f "usebackq tokens=* delims=" %%P in ("%ROOT%\.generated\%OPTION%\profiles.txt") do if not "%%P"=="" set "RUNTIME_PROFILE_ARGS=!RUNTIME_PROFILE_ARGS! --profile %%P"
 
 call :pin_docker_api_version
 if errorlevel 1 exit /b 1
@@ -69,37 +76,37 @@ if /I not "%OPTION_KIND%"=="local-ai-runtime" (
 
 echo.
 set "HAS_POSTGRES="
-for /f "delims=" %%S in ('docker compose -f "%GENERATED%" config --services') do (
+for /f "delims=" %%S in ('docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! config --services') do (
   if /I "%%S"=="postgres" set "HAS_POSTGRES=true"
 )
 if defined HAS_POSTGRES (
   echo === [start] Starting Postgres before database clients ===
-  docker compose -f "%GENERATED%" up -d --build --wait --wait-timeout %START_WAIT_TIMEOUT_SECONDS% postgres
+  docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! up -d --build --wait --wait-timeout %START_WAIT_TIMEOUT_SECONDS% postgres
   if errorlevel 1 (
-    call :dump_start_failure "%GENERATED%"
+    call :dump_start_failure
     exit /b 1
   )
 
   echo.
   echo === [start] Reconciling Postgres roles with current environment ===
-  docker compose -f "%GENERATED%" exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
+  docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! exec -T postgres /bin/bash /docker-entrypoint-initdb.d/00_init.sh
   if errorlevel 1 exit /b 1
 )
 
 echo.
-echo === [start] Starting %OPTION% from rendered Compose config ===
-docker compose -f "%GENERATED%" up -d --build --wait --wait-timeout %START_WAIT_TIMEOUT_SECONDS%
+echo === [start] Starting %OPTION% from the validated semantic Compose files ===
+docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! up -d --build --wait --wait-timeout %START_WAIT_TIMEOUT_SECONDS%
 if errorlevel 1 (
-  call :dump_start_failure "%GENERATED%"
+  call :dump_start_failure
   exit /b 1
 )
 
 if /I "%LOCAL_AI_PREPARE_MODEL%"=="true" (
   echo.
   echo === [start] Preparing Ollama model %LOCAL_AI_BASE_MODEL% and alias %LOCAL_AI_MODEL% ===
-  docker compose -f "%GENERATED%" exec ollama ollama pull "%LOCAL_AI_BASE_MODEL%"
+  docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! exec ollama ollama pull "%LOCAL_AI_BASE_MODEL%"
   if errorlevel 1 exit /b 1
-  docker compose -f "%GENERATED%" exec ollama ollama create "%LOCAL_AI_MODEL%" -f /Modelfile.planner
+  docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! exec ollama ollama create "%LOCAL_AI_MODEL%" -f /Modelfile.planner
   if errorlevel 1 exit /b 1
 )
 
@@ -120,20 +127,19 @@ if errorlevel 1 (
 exit /b 0
 
 :dump_start_failure
-set "COMPOSE_CONFIG=%~1"
 echo.
 echo === [start] Startup failed; targeted diagnostics follow ===
 echo Compose services:
-docker compose -f "%COMPOSE_CONFIG%" ps
+docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! ps
 for %%S in (api-gateway auth-service account-service config-server discovery-server valkey postgres) do (
   echo.
   echo --- %%S status ---
-  docker compose -f "%COMPOSE_CONFIG%" ps %%S
+  docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! ps %%S
   echo --- %%S logs ^(tail 160^) ---
-  docker compose -f "%COMPOSE_CONFIG%" logs --tail=160 %%S
+  docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! logs --tail=160 %%S
 )
 set "GATEWAY_CONTAINER="
-for /f "delims=" %%C in ('docker compose -f "%COMPOSE_CONFIG%" ps -q api-gateway 2^>NUL') do set "GATEWAY_CONTAINER=%%C"
+for /f "delims=" %%C in ('docker compose !RUNTIME_ENV_ARGS! !RUNTIME_FILE_ARGS! !RUNTIME_PROFILE_ARGS! ps -q api-gateway 2^>NUL') do set "GATEWAY_CONTAINER=%%C"
 if defined GATEWAY_CONTAINER (
   echo.
   echo --- api-gateway Docker health state ---

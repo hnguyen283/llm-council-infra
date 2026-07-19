@@ -83,15 +83,22 @@ if errorlevel 1 (
   exit /b 1
 )
 
-docker compose %ENV_ARGS% %FILE_ARGS% %PROFILE_ARGS% config > "%OUT_DIR%\compose.resolved.yaml"
+if exist "%OUT_DIR%\compose.resolved.yaml" del /Q "%OUT_DIR%\compose.resolved.yaml"
+rem Persist only metadata that cannot contain interpolated secret values.
+rem Runtime commands reassemble the validated Compose files from the lists above.
+docker compose %ENV_ARGS% %FILE_ARGS% %PROFILE_ARGS% config --services > "%OUT_DIR%\compose.services.txt"
 if errorlevel 1 (
-  echo ERROR: failed to write rendered Compose config.
+  echo ERROR: failed to write the rendered service summary.
   exit /b 1
 )
 
-call :write_masked_environment "%OUT_DIR%\environment.resolved.txt"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%\scripts\write-masked-environment.ps1" -OutputPath "%OUT_DIR%\environment.resolved.txt" -Root "%ROOT%" -EnvironmentListPath "%ENV_LIST%"
+if errorlevel 1 (
+  echo ERROR: failed to write the masked resolved environment summary.
+  exit /b 1
+)
 
-echo Rendered Compose config: %OUT_DIR%\compose.resolved.yaml
+echo Rendered service summary: %OUT_DIR%\compose.services.txt
 echo Rendered environment summary: %OUT_DIR%\environment.resolved.txt
 exit /b 0
 
@@ -101,35 +108,5 @@ set "ABS=%ROOT%\%REL%"
 if exist "%ABS%" (
   set "ENV_ARGS=%ENV_ARGS% --env-file "%ABS%""
   >> "%ENV_LIST%" echo %REL%
-)
-exit /b 0
-
-:write_masked_environment
-set "DEST=%~1"
-break > "%DEST%"
-for %%E in (defaults workspace modes\%MODE% option local.user.override) do rem keep parser simple
-for /f "usebackq tokens=1,* delims==" %%A in ("%ROOT%\env\defaults.env") do call :write_env_line "%DEST%" "%%A" "%%B"
-if exist "%ROOT%\env\workspace.env" for /f "usebackq tokens=1,* delims==" %%A in ("%ROOT%\env\workspace.env") do call :write_env_line "%DEST%" "%%A" "%%B"
-if exist "%ROOT%\env\modes\%MODE%.env" for /f "usebackq tokens=1,* delims==" %%A in ("%ROOT%\env\modes\%MODE%.env") do call :write_env_line "%DEST%" "%%A" "%%B"
-for /f "usebackq tokens=1,* delims==" %%A in ("%OPTION_DIR%\option.env") do call :write_env_line "%DEST%" "%%A" "%%B"
-if exist "%OPTION_DIR%\.env" for /f "usebackq tokens=1,* delims==" %%A in ("%OPTION_DIR%\.env") do call :write_env_line "%DEST%" "%%A" "%%B"
-if exist "%ROOT%\env\local.user.override.env" for /f "usebackq tokens=1,* delims==" %%A in ("%ROOT%\env\local.user.override.env") do call :write_env_line "%DEST%" "%%A" "%%B"
-exit /b 0
-
-:write_env_line
-set "DEST=%~1"
-set "KEY=%~2"
-set "VALUE=%~3"
-if "%KEY%"=="" exit /b 0
-if "%KEY:~0,1%"=="#" exit /b 0
-echo %KEY% | findstr /R /I "PASSWORD SECRET TOKEN PRIVATE PEM API_KEY HMAC_KEY SIGNING_KEY" >NUL
-if errorlevel 1 (
-  >> "%DEST%" echo %KEY%=%VALUE%
-) else (
-  if "%VALUE%"=="" (
-    >> "%DEST%" echo %KEY%=
-  ) else (
-    >> "%DEST%" echo %KEY%=***
-  )
 )
 exit /b 0
