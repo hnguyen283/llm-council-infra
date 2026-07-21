@@ -6,6 +6,18 @@ on:
     branches: [ main ]
 
 jobs:
+  ci-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the portable CI contract
+        run: bash ci/run.sh all
+      - name: Publish sanitized CI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-evidence-contract
+          path: .ci/evidence
+          if-no-files-found: error
   render-options:
     runs-on: ubuntu-latest
     strategy:
@@ -22,7 +34,11 @@ jobs:
           - prod-lite-local
     steps:
       - uses: actions/checkout@v4
-      - name: Render Compose option
-        run: sh scripts/config.sh "${{ matrix.option }}"
-      - name: Check environment contract
-        run: sh scripts/check-env.sh
+      - name: Render Compose option through portable contract
+        run: bash ci/run.sh validate
+      - name: Publish sanitized CI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-evidence-${{ matrix.option }}
+          path: .ci/evidence
+          if-no-files-found: error

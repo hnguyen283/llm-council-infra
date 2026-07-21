@@ -104,8 +104,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo === [laptop-local-ai] Starting local observability (AGE Viewer + Arize Phoenix) ===
-docker compose --env-file "%ENV_FILE%" %LOCAL_OBS_FILES% up -d age-viewer arize-phoenix
+echo === [laptop-local-ai] Starting local observability (AGE Viewer) ===
+docker compose --env-file "%ENV_FILE%" %LOCAL_OBS_FILES% up -d age-viewer
 if errorlevel 1 (
     echo Observability services failed. Non-fatal — continuing.
 )
@@ -197,16 +197,13 @@ exit /b 0
 
 :start_kafka_tunnel
 echo.
-echo === [laptop-local-ai] Checking local Arize Phoenix OTLP ports ===
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$deadline=(Get-Date).AddSeconds(10); do { $ok1=Test-NetConnection -ComputerName 127.0.0.1 -Port 4317 -InformationLevel Quiet; $ok2=Test-NetConnection -ComputerName 127.0.0.1 -Port 4318 -InformationLevel Quiet; if ($ok1 -and $ok2) { break }; Start-Sleep -Milliseconds 500 } until ((Get-Date) -gt $deadline); if (-not ($ok1 -and $ok2)) { Write-Host 'WARNING: Arize Phoenix is not responding on OTLP ports 4317/4318. Traces may not be forwarded.' -ForegroundColor Yellow } else { Write-Host 'Arize Phoenix OTLP ports are listening locally.' -ForegroundColor Green }"
-
-echo === [laptop-local-ai] Starting SSH tunnel for Kafka & OTLP Traces ===
+echo === [laptop-local-ai] Starting SSH tunnel for Kafka ===
 where plink.exe >NUL 2>&1
 if errorlevel 1 (
     echo ERROR: plink.exe was not found on PATH. Install PuTTY or set LOCAL_AI_SSH_TUNNEL_ENABLED=false.
     exit /b 1
 )
-for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $plink=(Get-Command plink.exe -ErrorAction Stop).Source; $args=@('-ssh','-N','-batch','-P',$env:VPS_SSH_PORT,'-l',$env:VPS_SSH_USER,'-pw',$env:VPS_SSH_PASSWORD,'-L',('127.0.0.1:'+$env:LOCAL_AI_KAFKA_TUNNEL_PORT+':127.0.0.1:9092'),'-R','0.0.0.0:4318:127.0.0.1:4318','-R','0.0.0.0:4317:127.0.0.1:4317',$env:VPS_SSH_HOST); $p=Start-Process -FilePath $plink -ArgumentList $args -WindowStyle Hidden -PassThru; $p.Id"`) do set "KAFKA_TUNNEL_PID=%%P"
+for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $plink=(Get-Command plink.exe -ErrorAction Stop).Source; $args=@('-ssh','-N','-batch','-P',$env:VPS_SSH_PORT,'-l',$env:VPS_SSH_USER,'-pw',$env:VPS_SSH_PASSWORD,'-L',('127.0.0.1:'+$env:LOCAL_AI_KAFKA_TUNNEL_PORT+':127.0.0.1:9092'),$env:VPS_SSH_HOST); $p=Start-Process -FilePath $plink -ArgumentList $args -WindowStyle Hidden -PassThru; $p.Id"`) do set "KAFKA_TUNNEL_PID=%%P"
 if not defined KAFKA_TUNNEL_PID (
     echo ERROR: failed to start the SSH tunnel.
     exit /b 1

@@ -4,15 +4,12 @@ networks:
   llm-council-data:
     external: true
 
-volumes:
-  phoenix-data:
-
 services:
 
   # Apache AGE Viewer — graph schema browser and Cypher query console.
   # Connects to postgres-knowledge on the llm-council-data network.
   age-viewer:
-    image: bitnine/agviewer:latest
+    image: bitnine/agviewer:latest@sha256:67e4e955eecdfdea57f37a90a18c6008d8bd9ee2bf5333a37c49c75a900efda4
     restart: unless-stopped
     ports:
       - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:3001:3001"
@@ -22,24 +19,3 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
-
-  # Arize Phoenix — OTel trace ingestion, RAG evaluation, embedding visualization.
-  # OTLP/gRPC on 4317, OTLP/HTTP mapped on 4318 (to container 6006), Web UI on 6006.
-  arize-phoenix:
-    image: arizephoenix/phoenix:latest
-    restart: unless-stopped
-    ports:
-      - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:6006:6006"
-      - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:4317:4317"
-      - "${LOCAL_OBS_HOST_BIND:-127.0.0.1}:4318:6006"
-    environment:
-      PHOENIX_PORT: "6006"
-      PHOENIX_HOST: "0.0.0.0"
-    volumes:
-      - phoenix-data:/root/.phoenix
-    networks: [llm-council-data]
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 1536M
