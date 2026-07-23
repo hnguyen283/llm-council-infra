@@ -1,6 +1,6 @@
 services:
   cloudflared:
-    image: cloudflare/cloudflared:2026.6.0
+    image: cloudflare/cloudflared:2026.6.0@sha256:ba461b8aa9c042156dbd39c38657fe7431bafa063220eab8d5330a523863da9f
     profiles: [tunnel]
     # The remotely managed route currently targets http://localhost:8080.
     # Sharing the edge network namespace makes that loopback address the

@@ -3,7 +3,7 @@
 Starts the local AI companion runtime for IDE workflows:
 
 - Ollama with the development port exposed on `127.0.0.1:11434`.
-- AGE Viewer and Arize Phoenix local observability helpers.
+- AGE Viewer local helper; trace export remains disabled until the Collector rollout.
 - The `deepseek-r1:7b` model and `planner` alias are prepared after startup.
 
 Run from `llm-council-infra`:

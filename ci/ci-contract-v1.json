@@ -1,0 +1,1 @@
+{"schemaVersion":"llm-council.ci-contract/v1","stages":["validate","test","security","package","evidence"],"checks":["ci.validate","ci.test","ci.security","ci.package","ci.evidence"],"evidenceSchemaVersion":"llm-council.ci-evidence/v1"}
