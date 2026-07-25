@@ -18,6 +18,7 @@ ssl*/
 
 # Generated diagnostics
 .generated/
+.ci/evidence/
 
 # Logs
 *.log

@@ -4,3 +4,4 @@ compose/compose.prod.yaml
 compose/compose.ui-nginx.yaml
 compose/compose.edge-http.yaml
 compose/compose.local-observability.yaml
+projects/graphrag/overlays/log-files.yml

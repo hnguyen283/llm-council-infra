@@ -43,7 +43,8 @@ services:
       GATEWAY_INTERNAL_AUDIENCE: ${GATEWAY_INTERNAL_AUDIENCE:-internal}
       ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
       PYTHONUNBUFFERED: "1"
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GRPC:-http://arize-phoenix:4317}
+      # Export remains disabled until Batch C selects and configures the Collector endpoint.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GRPC:-}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=3)\""]
       interval: 10s
@@ -79,7 +80,8 @@ services:
       GATEWAY_INTERNAL_AUDIENCE: ${GATEWAY_INTERNAL_AUDIENCE:-internal}
       ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
       PYTHONUNBUFFERED: "1"
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GRPC:-http://arize-phoenix:4317}
+      # Export remains disabled until Batch C selects and configures the Collector endpoint.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GRPC:-}
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f \"python -m src.server\" || exit 1"]
       interval: 10s
