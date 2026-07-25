@@ -10,7 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: hnguyen283/llm-council
+          ref: ${{ github.head_ref || github.ref_name }}
+          path: .ci/safety/llm-council
+      - uses: actions/checkout@v4
+        with:
+          repository: hnguyen283/llm-council-admin-ui
+          ref: ${{ github.head_ref || github.ref_name }}
+          path: .ci/safety/llm-council-admin-ui
       - name: Run the portable CI contract
+        env:
+          BP175_BACKEND_ROOT: ${{ github.workspace }}/.ci/safety/llm-council
+          BP175_INFRA_ROOT: ${{ github.workspace }}
+          BP175_ADMIN_ROOT: ${{ github.workspace }}/.ci/safety/llm-council-admin-ui
         run: bash ci/run.sh all
       - name: Publish sanitized CI evidence
         uses: actions/upload-artifact@v4

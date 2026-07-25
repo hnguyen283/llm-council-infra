@@ -1,7 +1,13 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$WorkspaceRoot
+    [string]$WorkspaceRoot,
+    [Parameter()]
+    [string]$BackendRoot,
+    [Parameter()]
+    [string]$InfraRoot,
+    [Parameter()]
+    [string]$AdminRoot
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +31,24 @@ function Get-SourceFiles {
         }
 }
 
+function Resolve-SafetyRoot {
+    param(
+        [string]$ExplicitRoot,
+        [string]$EnvironmentVariable,
+        [string]$FallbackRoot
+    )
+
+    $candidate = $ExplicitRoot
+    if ([string]::IsNullOrWhiteSpace($candidate)) {
+        $candidate = [Environment]::GetEnvironmentVariable($EnvironmentVariable)
+    }
+    if ([string]::IsNullOrWhiteSpace($candidate)) {
+        $candidate = $FallbackRoot
+    }
+
+    return (Resolve-Path -LiteralPath $candidate -ErrorAction Stop).Path
+}
+
 function Assert-PatternAbsent {
     param(
         [System.IO.FileInfo[]]$Files,
@@ -39,9 +63,9 @@ function Assert-PatternAbsent {
     }
 }
 
-$backendRoot = Join-Path $WorkspaceRoot "llm-council"
-$infraRoot = Join-Path $WorkspaceRoot "llm-council-infra"
-$adminRoot = Join-Path $WorkspaceRoot "llm-council-admin-ui"
+$backendRoot = Resolve-SafetyRoot $BackendRoot "BP175_BACKEND_ROOT" (Join-Path $WorkspaceRoot "llm-council")
+$infraRoot = Resolve-SafetyRoot $InfraRoot "BP175_INFRA_ROOT" (Join-Path $WorkspaceRoot "llm-council-infra")
+$adminRoot = Resolve-SafetyRoot $AdminRoot "BP175_ADMIN_ROOT" (Join-Path $WorkspaceRoot "llm-council-admin-ui")
 $registry = Join-Path $backendRoot "docs\architecture\observation-envelope-v1.yaml"
 
 if (-not (Test-Path -LiteralPath $registry)) {
