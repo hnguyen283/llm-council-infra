@@ -15,11 +15,15 @@ jobs:
           repository: hnguyen283/llm-council
           ref: ${{ github.head_ref || github.ref_name }}
           path: .ci/safety/llm-council
+          token: ${{ secrets.BP175_CROSS_REPO_READ_TOKEN }}
+          persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: hnguyen283/llm-council-admin-ui
           ref: ${{ github.head_ref || github.ref_name }}
           path: .ci/safety/llm-council-admin-ui
+          token: ${{ secrets.BP175_CROSS_REPO_READ_TOKEN }}
+          persist-credentials: false
       - name: Run the portable CI contract
         env:
           BP175_BACKEND_ROOT: ${{ github.workspace }}/.ci/safety/llm-council
