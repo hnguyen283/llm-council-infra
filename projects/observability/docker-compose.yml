@@ -5,6 +5,8 @@ name: llm-council-observability
 #
 # Networks:
 #   - llm-council-observability  every observability service joins this.
+#   - llm-council-otel-ingest    only Collector-canary workloads and the
+#                                Collector join this private OTLP ingress.
 #   - llm-council-app            prometheus ALSO joins this so it can scrape
 #                                 the 8 Spring application services that live
 #                                 in projects/core/ (api-gateway, auth-service,
@@ -39,6 +41,8 @@ name: llm-council-observability
 
 networks:
   llm-council-observability:
+    external: true
+  llm-council-otel-ingest:
     external: true
   llm-council-app:
     external: true
@@ -115,6 +119,32 @@ services:
       retries: 18
       start_period: 20s
 
+
+  # Backend-neutral BP1.75 canary. No receiver, health, or self-metric port is
+  # published. Only the retrieval workload reaches OTLP on the private ingest
+  # network; this service alone reaches the internal comparison backend.
+  otel-collector:
+    profiles: ["collector-canary"]
+    image: otel/opentelemetry-collector-contrib@sha256:f2f01157055a9b2aab9df7118e1f1c9abf345e99b23bc7a2bc791db374a7d0f6
+    command: ["--config=/etc/otelcol/${OTEL_COLLECTOR_CONFIG_FILE:-collector-canary.yaml}"]
+    environment:
+      OTELCOL_INGEST_TOKEN: ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}
+    networks: [llm-council-otel-ingest, llm-council-observability]
+    volumes:
+      - ./otelcol:/etc/otelcol:ro
+    tmpfs:
+      - /var/lib/otelcol:rw,noexec,nosuid,size=96m
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "--version"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
   # Grafana service removed 2026-05-22 (P1.7). AGPL-3.0 Critical exposure
   # retired. Perses provisioning fallback invoked per the approved 02 §3.4
   # contingency: app-native dashboard build is deferred to P2/P3. Operators

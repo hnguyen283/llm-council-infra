@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "llm-council.bp175-recovery-evidence/v1",
+  "recordedAt": "2026-08-31T23:55:06.5668202Z",
+  "collectorImage": "otel/opentelemetry-collector-contrib@sha256:f2f01157055a9b2aab9df7118e1f1c9abf345e99b23bc7a2bc791db374a7d0f6",
+  "validation": {
+    "exactImageConfiguration": "passed: collector-canary.yaml and collector-proof.yaml",
+    "canaryOptionRender": "passed: prod-full-local-observability-collector-canary",
+    "disposableRuntimeProof": "passed: cold start, bearer auth, service/field policy, self-metrics, bounded Zipkin outage, recovery"
+  },
+  "resourceBudget": {
+    "collectorMemoryLimit": "384MiB",
+    "collectorCpuLimit": "0.50",
+    "collectorMemoryLimiter": "256MiB plus 64MiB spike",
+    "collectorTmpfsQueue": "96MiB",
+    "exporterQueueSize": 512,
+    "proofAcceptedRequestsDuringOutage": 600,
+    "workloadOverheadBaseline": "not measured; retained as a production-promotion gate outside this local canary approval"
+  },
+  "residualGates": [
+    "OpenLIT and ClickHouse qualification remain blocked",
+    "Indexer telemetry is not enabled because it has no qualified semantic-span surface",
+    "No production rollout or ENFORCE transition is authorized by this evidence"
+  ]
+}

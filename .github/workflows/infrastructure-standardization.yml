@@ -3,24 +3,55 @@ name: infrastructure-standardization
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   ci-contract:
     runs-on: ubuntu-latest
+    env:
+      OTEL_COLLECTOR_INGEST_TOKEN: ci-contract-validation-token
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Resolve backend safety ref
+        id: backend-ref
+        env:
+          CROSS_REPO_TOKEN: ${{ secrets.BP175_CROSS_REPO_READ_TOKEN }}
+          REQUESTED_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          repository=hnguyen283/llm-council
+          if [ -n "$CROSS_REPO_TOKEN" ] && git ls-remote --exit-code "https://x-access-token:${CROSS_REPO_TOKEN}@github.com/${repository}.git" "refs/heads/${REQUESTED_REF}" >/dev/null 2>&1; then
+            echo "ref=${REQUESTED_REF}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: hnguyen283/llm-council
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ steps.backend-ref.outputs.ref }}
           path: .ci/safety/llm-council
           token: ${{ secrets.BP175_CROSS_REPO_READ_TOKEN }}
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - name: Resolve admin safety ref
+        id: admin-ref
+        env:
+          CROSS_REPO_TOKEN: ${{ secrets.BP175_CROSS_REPO_READ_TOKEN }}
+          REQUESTED_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          repository=hnguyen283/llm-council-admin-ui
+          if [ -n "$CROSS_REPO_TOKEN" ] && git ls-remote --exit-code "https://x-access-token:${CROSS_REPO_TOKEN}@github.com/${repository}.git" "refs/heads/${REQUESTED_REF}" >/dev/null 2>&1; then
+            echo "ref=${REQUESTED_REF}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: hnguyen283/llm-council-admin-ui
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ steps.admin-ref.outputs.ref }}
           path: .ci/safety/llm-council-admin-ui
           token: ${{ secrets.BP175_CROSS_REPO_READ_TOKEN }}
           persist-credentials: false
@@ -31,32 +62,22 @@ jobs:
           BP175_ADMIN_ROOT: ${{ github.workspace }}/.ci/safety/llm-council-admin-ui
         run: bash ci/run.sh all
       - name: Publish sanitized CI evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ci-evidence-contract
           path: .ci/evidence
           if-no-files-found: error
   render-options:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        option:
-          - dev-full-http
-          - dev-full-https
-          - dev-local-ai
-          - prod-full-local-http
-          - prod-full-local-https
-          - prod-full-local-https-tunnel
-          - prod-full-local-observability
-          - prod-lite-local
+    env:
+      OTEL_COLLECTOR_INGEST_TOKEN: ci-contract-validation-token
     steps:
-      - uses: actions/checkout@v4
-      - name: Render Compose option through portable contract
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Render all Compose options through the portable contract
         run: bash ci/run.sh validate
       - name: Publish sanitized CI evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ci-evidence-${{ matrix.option }}
+          name: ci-evidence-options
           path: .ci/evidence
           if-no-files-found: error

@@ -11,7 +11,7 @@ networks:
   llm-council-data:          { external: true }
   llm-council-messaging:     { external: true }
   llm-council-app:           { external: true }
-  llm-council-observability: { external: true }
+  llm-council-otel-ingest:   { external: true }
   llm-council-ai-runtime:    { external: true }
 
 services:
@@ -19,7 +19,7 @@ services:
   graphrag-retrieval-service:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/graphrag-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/graphrag-service, dockerfile: Dockerfile }
-    networks: [llm-council-data, llm-council-app, llm-council-observability, llm-council-ai-runtime]
+    networks: [llm-council-data, llm-council-app, llm-council-otel-ingest, llm-council-ai-runtime]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -43,8 +43,10 @@ services:
       GATEWAY_INTERNAL_AUDIENCE: ${GATEWAY_INTERNAL_AUDIENCE:-internal}
       ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
       PYTHONUNBUFFERED: "1"
-      # Export remains disabled until Batch C selects and configures the Collector endpoint.
+      OTEL_SERVICE_NAME: graphrag-retrieval-service
+      # Empty by default; the Collector-only canary option enables this endpoint.
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GRPC:-}
+      OTEL_EXPORTER_OTLP_BEARER_TOKEN: ${OTEL_COLLECTOR_INGEST_TOKEN:-}
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=3)\""]
       interval: 10s
@@ -55,7 +57,7 @@ services:
   graphrag-indexing-worker:
     image: ${LLM_COUNCIL_IMAGE_REGISTRY:-local/llm-council}/graphrag-service:${IMAGE_TAG:-local}
     build: { context: ../../../llm-council/graphrag-service, dockerfile: Dockerfile }
-    networks: [llm-council-data, llm-council-messaging, llm-council-observability, llm-council-ai-runtime]
+    networks: [llm-council-data, llm-council-messaging, llm-council-ai-runtime]
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -80,8 +82,6 @@ services:
       GATEWAY_INTERNAL_AUDIENCE: ${GATEWAY_INTERNAL_AUDIENCE:-internal}
       ACCOUNT_INTERNAL_SERVICE_TOKEN: ${ACCOUNT_INTERNAL_SERVICE_TOKEN:-}
       PYTHONUNBUFFERED: "1"
-      # Export remains disabled until Batch C selects and configures the Collector endpoint.
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GRPC:-}
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f \"python -m src.server\" || exit 1"]
       interval: 10s

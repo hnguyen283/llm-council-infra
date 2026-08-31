@@ -5,7 +5,7 @@ stage=${1:-all}; profile=${CI:+github-actions}; profile=${profile:-local}
 record() {
   python3 - "$1" "$2" "$profile" <<'PY'
 import hashlib,json,pathlib,subprocess,sys
-name,outcome,profile=sys.argv[1:]; allowed={'ci.validate','ci.test','ci.security','ci.package','ci.evidence'}
+name,outcome,profile=sys.argv[1:]; allowed={'ci.validate','ci.test','ci.collector_canary','ci.security','ci.package','ci.evidence'}
 if name not in allowed or outcome not in {'passed','failed'}: raise SystemExit(2)
 base=pathlib.Path('.ci/evidence'); base.mkdir(parents=True,exist_ok=True)
 try: sha=subprocess.check_output(['git','-c','safe.directory=.','rev-parse','HEAD'],text=True).strip(); dirty=bool(subprocess.check_output(['git','-c','safe.directory=.','status','--porcelain'],text=True).strip())
@@ -27,10 +27,10 @@ powershell_file() {
     return 127
   fi
 }
-render_all(){ for option in dev-full-http dev-full-https dev-local-ai prod-full-local-http prod-full-local-https prod-full-local-https-tunnel prod-full-local-observability prod-lite-local; do sh scripts/config.sh "$option"; done; }
+render_all(){ : "${OTEL_COLLECTOR_INGEST_TOKEN:=ci-contract-validation-token}"; export OTEL_COLLECTOR_INGEST_TOKEN; for option in dev-full-http dev-full-https dev-local-ai prod-full-local-http prod-full-local-https prod-full-local-https-tunnel prod-full-local-observability prod-full-local-observability-collector-canary prod-lite-local; do sh scripts/config.sh "$option"; done; }
 one(){ case "$1" in
  validate) run ci.validate render_all ;;
- test) run ci.test powershell_file scripts/check-bp175-safety.ps1 ;;
+ test) run ci.test powershell_file scripts/check-bp175-safety.ps1; run ci.collector_canary powershell_file scripts/check-bp175-collector-canary.ps1 ;;
  security) run ci.security powershell_file projects/scripts/check-image-digests.ps1 ;;
  package) run ci.package sh scripts/config.sh prod-full-local-observability ;;
  evidence) record ci.evidence passed ;;
