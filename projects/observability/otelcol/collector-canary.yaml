@@ -1,0 +1,144 @@
+# BP1.75 sustained Collector canary policy gateway.
+#
+# This config is content-free by construction. It accepts authenticated traces
+# only from the retrieval service, retains only fields listed in the registry,
+# and has no debug exporter. The separate collector-proof.yaml is the sole
+# disposable diagnostic sink used by the runtime proof.
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  file_storage/telemetry_queue:
+    directory: /var/lib/otelcol/queue
+    create_directory: true
+    timeout: 1s
+  bearertokenauth/ingest:
+    scheme: Bearer
+    token: ${env:OTELCOL_INGEST_TOKEN}
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: bearertokenauth/ingest
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth/ingest
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+  # Network reachability is necessary but not sufficient. Only the real
+  # retrieval workload identity is admitted before any trusted stamp is added.
+  filter/allowlisted-services:
+    error_mode: ignore
+    traces:
+      span:
+        - resource.attributes["service.name"] != "graphrag-retrieval-service"
+
+  # Span names and structures are part of the content-free contract. Events
+  # may carry arbitrary attributes or bodies, so the canary does not admit them.
+  filter/allowlisted-shape:
+    error_mode: ignore
+    traces:
+      span:
+        - name != "RetrievalPipeline" and name != "VectorSearch" and name != "GraphTraversal"
+        - Len(events) > 0
+
+  # Sensitive values reject the entire record before the registry can remove
+  # unknown attributes; partial redaction would leave sibling data unsafe.
+  filter/prohibited-fields:
+    error_mode: ignore
+    traces:
+      span:
+        - attributes["rag.query"] != nil
+        - attributes["llm_council.tenant_id"] != nil
+        - attributes["llm_council.document_id"] != nil
+        - attributes["llm_council.entity_name"] != nil
+        - attributes["gen_ai.prompt"] != nil
+        - attributes["gen_ai.completion"] != nil
+        - attributes["input.value"] != nil
+        - attributes["output.value"] != nil
+        - attributes["http.request.header.authorization"] != nil
+        - attributes["http.request.header.cookie"] != nil
+
+  # Keep only the enumerated observability values. Pseudonymous tenant and
+  # correlation labels are deliberately not forwarded. The test marker is a
+  # proof-only registered key and is never emitted by the workload itself.
+  transform/attribute-registry:
+    error_mode: ignore
+    trace_statements:
+      - context: resource
+        statements:
+          - keep_keys(attributes, ["service.name", "service.version"])
+      - context: span
+        statements:
+          - keep_keys(attributes, ["rag.query_length", "rag.fallback_mode", "rag.context_precision", "rag.hit_miss_ratio", "rag.confidence_score", "rag.vector_hits_count", "rag.max_similarity", "llm_council.telemetry.test_marker"])
+
+  resource/trusted-stamp:
+    attributes:
+      - key: service.namespace
+        action: upsert
+        value: llm-council
+      - key: deployment.environment
+        action: upsert
+        value: local
+      - key: llm_council.telemetry_gateway
+        action: upsert
+        value: otel-collector
+      - key: llm_council.telemetry_policy
+        action: upsert
+        value: bp175-canary-v2
+
+  probabilistic_sampler/canary:
+    sampling_percentage: 100
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+
+exporters:
+  # A sanitized internal comparison only. The bounded persistent queue is on
+  # tmpfs, so a Collector restart discards buffered telemetry rather than
+  # persisting customer-derived data or delaying product traffic.
+  otlp_http/zipkin-comparison:
+    endpoint: http://zipkin:9411
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      queue_size: 512
+      storage: file_storage/telemetry_queue
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 5s
+      max_elapsed_time: 30s
+
+service:
+  extensions: [health_check, file_storage/telemetry_queue, bearertokenauth/ingest]
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors:
+        [memory_limiter, filter/allowlisted-services, filter/allowlisted-shape, filter/prohibited-fields, transform/attribute-registry, resource/trusted-stamp, probabilistic_sampler/canary, batch]
+      exporters: [otlp_http/zipkin-comparison]

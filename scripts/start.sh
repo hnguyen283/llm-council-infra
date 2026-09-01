@@ -121,6 +121,7 @@ ensure_network() {
 ensure_network llm-council-data
 ensure_network llm-council-messaging
 ensure_network llm-council-observability
+ensure_network llm-council-otel-ingest
 ensure_network llm-council-platform
 ensure_network llm-council-app
 ensure_network llm-council-ai-runtime

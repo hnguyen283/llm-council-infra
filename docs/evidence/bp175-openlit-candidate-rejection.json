@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "llm-council.artifact-qualification/v1",
+  "recordedOn": "2026-07-25",
+  "decision": "rejected",
+  "reason": "OpenLIT candidates exceed the Batch C high/critical vulnerability hard gate. They were not added to Compose or an active runtime option.",
+  "scanner": {
+    "tool": "trivy 0.72.0",
+    "modes": ["vulnerability", "secret", "misconfiguration"]
+  },
+  "candidates": [
+    {
+      "coordinate": "ghcr.io/openlit/openlit",
+      "version": "1.21.1",
+      "digest": "sha256:c8a73527301273fbb71b803e493338809126258a51166918de73ff3ee48ee6de",
+      "high": 160,
+      "critical": 16,
+      "secrets": 0,
+      "misconfigurations": 0
+    },
+    {
+      "coordinate": "ghcr.io/openlit/openlit",
+      "version": "1.24.1",
+      "digest": "sha256:bc8c3d402f6b114483c87eeb0b85d7faf2ec89db72d45144a751392165a77797",
+      "high": 155,
+      "critical": 16,
+      "secrets": 0,
+      "misconfigurations": 0
+    }
+  ],
+  "nextAction": "Requalify a vendor-remediated image. Do not waive this hard gate with a digest pin or repository license alone."
+}

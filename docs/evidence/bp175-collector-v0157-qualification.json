@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "llm-council.artifact-qualification/v1",
+  "qualifiedOn": "2026-07-25",
+  "artifact": {
+    "component": "OpenTelemetry Collector Contrib",
+    "coordinate": "otel/opentelemetry-collector-contrib",
+    "version": "0.157.0",
+    "digest": "sha256:f2f01157055a9b2aab9df7118e1f1c9abf345e99b23bc7a2bc791db374a7d0f6",
+    "amd64Manifest": "sha256:4eb842091c796156d4d3c994eb22ba793590f5723719dbf6b8436cb4dfc17f48",
+    "sourceRevision": "145e73e8663aff5ce978ea38cf0cbd4a97017141",
+    "license": "Apache-2.0"
+  },
+  "provenance": {
+    "tool": "cosign 3.1.2",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "identity": "https://github.com/open-telemetry/opentelemetry-collector-releases/.github/workflows/base-release.yaml@refs/tags/v0.157.0",
+    "result": "passed"
+  },
+  "scans": {
+    "sbom": { "tool": "syft 1.44.0", "format": "CycloneDX 1.6", "components": 1056, "result": "passed" },
+    "vulnerabilitySecretMisconfiguration": { "tool": "trivy 0.72.0", "highOrCritical": 0, "secrets": 0, "misconfigurations": 0, "result": "passed" },
+    "license": { "tool": "trivy 0.72.0", "result": "passed" },
+    "malware": { "tool": "Microsoft Defender", "signatureVersion": "1.455.339.0", "newDetections": 0, "result": "passed" }
+  },
+  "evidenceHandling": "Raw scanner output is regenerated locally and is not committed. scripts/check-bp175-collector-canary.ps1 validates the exact artifact/config in CI."
+}

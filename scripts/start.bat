@@ -59,6 +59,7 @@ if errorlevel 1 exit /b 1
 call :ensure_network llm-council-data
 call :ensure_network llm-council-messaging
 call :ensure_network llm-council-observability
+call :ensure_network llm-council-otel-ingest
 call :ensure_network llm-council-platform
 call :ensure_network llm-council-app
 call :ensure_network llm-council-ai-runtime
