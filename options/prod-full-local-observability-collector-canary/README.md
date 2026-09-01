@@ -1,10 +1,12 @@
 # prod-full-local-observability-collector-canary
 
-Production-like local observability stack with the BP1.75 retrieval-only
-Collector canary.
+Production-like local observability stack with the BP1.75 GraphRAG plus
+single-Orchestrator Collector canary.
 
-- Only `graphrag-retrieval-service` joins `llm-council-otel-ingest` and can
-  reach `otel-collector`. The indexing worker has no telemetry route in this
+- Only `graphrag-retrieval-service` and the `orchestrator-service` GraphRAG
+  client join `llm-council-otel-ingest` and can reach `otel-collector`. The
+  overlay redirects only that Orchestrator OTLP route; all other Java exporters
+  stay on their existing path. The indexing worker has no telemetry route in this
   profile because it has no qualified semantic-span surface yet.
 - Collector ingress requires `OTEL_COLLECTOR_INGEST_TOKEN`; it is never stored
   in `option.env`. Set it in the shell or the option's untracked `.env` before
@@ -14,7 +16,8 @@ Collector canary.
 $env:OTEL_COLLECTOR_INGEST_TOKEN = [guid]::NewGuid().ToString('N')
 ```
 
-- The sustained Collector permits only three fixed span names and the explicit
+- The sustained Collector permits only the three GraphRAG span names and two
+  explicit Orchestrator GraphRAG client span names, plus the explicit
   field registry. Unknown attributes are stripped, prohibited fields drop the
   whole record, and trusted stamps are added only afterward.
 - The sustained configuration exports only the sanitized internal Zipkin
