@@ -1,7 +1,7 @@
 # BP1.75 sustained Collector canary policy gateway.
 #
 # This config is content-free by construction. It accepts authenticated traces
-# only from the retrieval service and the single Orchestrator GraphRAG client canary, retains only fields listed in the registry,
+# only from the retrieval service, the Orchestrator GraphRAG client, and the API Gateway edge canary, retains only fields listed in the registry,
 # and has no debug exporter. The separate collector-proof.yaml is the sole
 # disposable diagnostic sink used by the runtime proof.
 
@@ -40,7 +40,7 @@ processors:
     error_mode: ignore
     traces:
       span:
-        - resource.attributes["service.name"] != "graphrag-retrieval-service" and resource.attributes["service.name"] != "orchestrator-service"
+        - resource.attributes["service.name"] != "graphrag-retrieval-service" and resource.attributes["service.name"] != "orchestrator-service" and resource.attributes["service.name"] != "api-gateway"
 
   # Span names and structures are part of the content-free contract. Events
   # may carry arbitrary attributes or bodies, so the canary does not admit them.
@@ -48,8 +48,14 @@ processors:
     error_mode: ignore
     traces:
       span:
-        - name != "RetrievalPipeline" and name != "VectorSearch" and name != "GraphTraversal" and name != "GraphRagClient.executeLocalSearch" and name != "GraphRagClient.executeGlobalSearch"
+        - name != "RetrievalPipeline" and name != "VectorSearch" and name != "GraphTraversal" and name != "GraphRagClient.executeLocalSearch" and name != "GraphRagClient.executeGlobalSearch" and name != "http get /actuator/health"
+        - resource.attributes["service.name"] == "api-gateway" and kind != SPAN_KIND_SERVER
+        - resource.attributes["service.name"] == "api-gateway" and attributes["method"] != "GET"
+        - resource.attributes["service.name"] == "api-gateway" and attributes["outcome"] != "SUCCESS"
+        - resource.attributes["service.name"] == "api-gateway" and attributes["status"] != "200"
+        - resource.attributes["service.name"] == "api-gateway" and attributes["uri"] != "/actuator/health"
         - Len(events) > 0
+        - Len(links) > 0
 
   # Sensitive values reject the entire record before the registry can remove
   # unknown attributes; partial redaction would leave sibling data unsafe.
@@ -67,6 +73,10 @@ processors:
         - attributes["output.value"] != nil
         - attributes["http.request.header.authorization"] != nil
         - attributes["http.request.header.cookie"] != nil
+        - attributes["http.response.header.set-cookie"] != nil
+        - attributes["http.request.body"] != nil
+        - attributes["http.response.body"] != nil
+        - attributes["body"] != nil
 
   # Keep only the enumerated observability values. Pseudonymous tenant and
   # correlation labels are deliberately not forwarded. The test marker is a
@@ -79,7 +89,8 @@ processors:
           - keep_keys(attributes, ["service.name", "service.version"])
       - context: span
         statements:
-          - keep_keys(attributes, ["rag.query_length", "rag.operation", "rag.fallback_mode", "rag.context_precision", "rag.hit_miss_ratio", "rag.confidence_score", "rag.vector_hits_count", "rag.max_similarity", "llm_council.telemetry.test_marker"])
+          - keep_keys(attributes, ["rag.query_length", "rag.operation", "rag.fallback_mode", "rag.context_precision", "rag.hit_miss_ratio", "rag.confidence_score", "rag.vector_hits_count", "rag.max_similarity", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] != "api-gateway"
+          - keep_keys(attributes, ["method", "outcome", "status", "uri", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] == "api-gateway"
 
   resource/trusted-stamp:
     attributes:
@@ -94,7 +105,7 @@ processors:
         value: otel-collector
       - key: llm_council.telemetry_policy
         action: upsert
-        value: bp175-canary-v2
+        value: bp175-canary-v3
 
   probabilistic_sampler/canary:
     sampling_percentage: 100

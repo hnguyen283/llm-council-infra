@@ -67,7 +67,8 @@ function New-TracePayload {
         [string]$ServiceName,
         [string]$Marker,
         [string]$ForbiddenAttribute,
-        [string]$UnregisteredAttribute = ""
+        [string]$UnregisteredAttribute = "",
+        [string]$SpanName = "RetrievalPipeline"
     )
     $attributes = @(
         @{ key = "rag.query_length"; value = @{ intValue = "7" } },

@@ -23,7 +23,8 @@ jobs:
         run: |
           set -euo pipefail
           repository=hnguyen283/llm-council
-          if [ -n "$CROSS_REPO_TOKEN" ] && git ls-remote --exit-code "https://x-access-token:${CROSS_REPO_TOKEN}@github.com/${repository}.git" "refs/heads/${REQUESTED_REF}" >/dev/null 2>&1; then
+          available_refs=$(GH_TOKEN="$CROSS_REPO_TOKEN" gh api --paginate "repos/${repository}/branches?per_page=100" --jq '.[].name' 2>/dev/null || true)
+          if printf '%s\n' "$available_refs" | grep -Fqx "$REQUESTED_REF"; then
             echo "ref=${REQUESTED_REF}" >> "$GITHUB_OUTPUT"
           else
             echo "ref=main" >> "$GITHUB_OUTPUT"
@@ -43,7 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           repository=hnguyen283/llm-council-admin-ui
-          if [ -n "$CROSS_REPO_TOKEN" ] && git ls-remote --exit-code "https://x-access-token:${CROSS_REPO_TOKEN}@github.com/${repository}.git" "refs/heads/${REQUESTED_REF}" >/dev/null 2>&1; then
+          available_refs=$(GH_TOKEN="$CROSS_REPO_TOKEN" gh api --paginate "repos/${repository}/branches?per_page=100" --jq '.[].name' 2>/dev/null || true)
+          if printf '%s\n' "$available_refs" | grep -Fqx "$REQUESTED_REF"; then
             echo "ref=${REQUESTED_REF}" >> "$GITHUB_OUTPUT"
           else
             echo "ref=main" >> "$GITHUB_OUTPUT"
