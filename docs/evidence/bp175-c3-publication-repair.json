@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "llm-council.bp175-c3-publication-evidence/v1",
+  "recordedAtUtc": "2026-09-01T21:54:10.8462849Z",
+  "pipelineContractVersion": "llm-council.ci-contract/v1",
+  "environmentProfile": "prod-full-local-observability-collector-canary",
+  "testedSource": {
+    "backendSha": "5e6f2a324c96150e3ab003d0521f004fe603a420",
+    "infrastructureSha": "0432697223807237564734136f3b8e89283ccbed"
+  },
+  "validation": {
+    "mavenReactor": "passed: common 56 tests; orchestrator-service 374 tests; zero failures/errors; one Docker-gated test skipped",
+    "focusedJava": "passed: GraphRagClientTest 7 tests; zero failures/errors",
+    "graphRagW3cContext": "passed: valid and invalid inbound W3C context assertions in the production-like GraphRAG image",
+    "collectorStaticPolicy": "passed",
+    "composeRender": "passed",
+    "isolatedP0RuntimeProof": "passed"
+  },
+  "runtime": {
+    "baselineP95Ms": 21.624,
+    "canaryP95Ms": 26.862,
+    "outageP95Ms": 49.133,
+    "recoveryP95Ms": 57.943,
+    "parentChildTraceContinuityVerified": true,
+    "collectorOutageProductPath": "passed",
+    "collectorRecovery": "passed",
+    "privateNetworkCleanupVerified": true
+  },
+  "sourceRuntimeEvidenceSha256": "90328d28f4d774d824c13ddc6bb5217da719557876f4fd189279b0f18fbd8775",
+  "residualGates": [
+    "C3.2 OpenLIT, ClickHouse, Promptfoo, operator RBAC, retention/deletion, backup/restore, and production rollout remain outside this evidence",
+    "No production rollout or enforcement transition is authorized",
+    "The indexing worker remains outside the qualified telemetry path"
+  ]
+}

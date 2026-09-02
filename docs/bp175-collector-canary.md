@@ -2,8 +2,9 @@
 
 ## Scope and safety boundary
 
-`prod-full-local-observability-collector-canary` is a local, retrieval-only
-proof profile. `graphrag-retrieval-service` is the sole workload on the private
+`prod-full-local-observability-collector-canary` is a local GraphRAG plus
+single-Orchestrator proof profile. `graphrag-retrieval-service` and the
+Orchestrator GraphRAG client are the only workloads on the private
 `llm-council-otel-ingest` network. The indexing worker is intentionally outside
 this path: it does not yet emit a qualified semantic trace, so it must not be
 presented as migrated.
@@ -36,10 +37,12 @@ validation for both the sustained and disposable proof configurations.
 
 The sustained configuration accepts only authenticated traces with:
 
-- service name `graphrag-retrieval-service`;
-- span name `RetrievalPipeline`, `VectorSearch`, or `GraphTraversal`;
+- service name `graphrag-retrieval-service` or `orchestrator-service`;
+- GraphRAG span name `RetrievalPipeline`, `VectorSearch`, or `GraphTraversal`,
+  or Orchestrator span name `GraphRagClient.executeLocalSearch` or
+  `GraphRagClient.executeGlobalSearch`;
 - no events; and
-- the explicit span-field registry: `rag.query_length`, `rag.fallback_mode`,
+- the explicit span-field registry: `rag.query_length`, `rag.operation`, `rag.fallback_mode`,
   `rag.context_precision`, `rag.hit_miss_ratio`, `rag.confidence_score`,
   `rag.vector_hits_count`, and `rag.max_similarity`.
 
@@ -88,9 +91,10 @@ option. Do not redirect workloads directly to Zipkin, OpenLIT, or ClickHouse.
 
 ## Remaining Batch C gates
 
-This is a Collector-only, local proof. It does not approve OpenLIT/ClickHouse
+This is a local Collector-gateway canary. It does not approve OpenLIT/ClickHouse
 artifact intake, operator RBAC, retention/deletion, backup/restore, resource
-headroom, Java semantic rendering, the indexing worker, full workload
-migration, or production rollout. OpenLIT remains rejected by the existing
+headroom, the indexing worker, full workload migration beyond the named
+Orchestrator client, or production rollout. OpenLIT remains rejected by the
+existing
 high/critical vulnerability gate until a vendor-remediated image passes the
 same qualification.

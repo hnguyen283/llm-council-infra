@@ -27,9 +27,11 @@ $actualConfigPath = Join-Path $InfraRoot "projects\observability\otelcol\collect
 $proofConfigPath = Join-Path $InfraRoot "projects\observability\otelcol\collector-proof.yaml"
 $composePath = Join-Path $InfraRoot "projects\observability\docker-compose.yml"
 $graphPath = Join-Path $InfraRoot "projects\graphrag\docker-compose.yml"
+$coreOverlayPath = Join-Path $InfraRoot "projects\core\overlays\collector-canary.yml"
 $optionPath = Join-Path $InfraRoot "options\prod-full-local-observability-collector-canary\option.env"
+$composeFilesPath = Join-Path $InfraRoot "options\prod-full-local-observability-collector-canary\compose.files"
 
-foreach ($path in @($actualConfigPath, $proofConfigPath, $composePath, $graphPath, $optionPath)) {
+foreach ($path in @($actualConfigPath, $proofConfigPath, $composePath, $graphPath, $coreOverlayPath, $optionPath, $composeFilesPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "BP1.75 Collector check failed: required path is missing: $path"
     }
@@ -39,7 +41,9 @@ $actual = Get-Content -LiteralPath $actualConfigPath -Raw
 $proof = Get-Content -LiteralPath $proofConfigPath -Raw
 $compose = Get-Content -LiteralPath $composePath -Raw
 $graph = Get-Content -LiteralPath $graphPath -Raw
+$coreOverlay = Get-Content -LiteralPath $coreOverlayPath -Raw
 $option = Get-Content -LiteralPath $optionPath -Raw
+$composeFiles = Get-Content -LiteralPath $composeFilesPath -Raw
 
 foreach ($required in @(
     'endpoint: 0.0.0.0:4317',
@@ -72,6 +76,12 @@ Reject-Text $actual 'debug/test-sink:' 'debug exporter in the sustained canary'
 Require-Text $proof 'debug/test-sink:' 'disposable proof debug exporter'
 Require-Text $proof 'transform/attribute-registry:' 'proof registry enforcement'
 Require-Text $proof 'bearertokenauth/ingest:' 'proof ingress authentication'
+foreach ($collectorConfig in @($actual, $proof)) {
+    Require-Text $collectorConfig 'orchestrator-service' 'Orchestrator C3 service allowlist'
+    Require-Text $collectorConfig 'GraphRagClient.executeLocalSearch' 'Orchestrator local-search span allowlist'
+    Require-Text $collectorConfig 'GraphRagClient.executeGlobalSearch' 'Orchestrator global-search span allowlist'
+    Require-Text $collectorConfig '"rag.operation"' 'Orchestrator operation registry field'
+}
 
 Require-Text $compose 'otel/opentelemetry-collector-contrib@sha256:f2f01157055a9b2aab9df7118e1f1c9abf345e99b23bc7a2bc791db374a7d0f6' 'pinned Collector image'
 Require-Text $compose 'OTELCOL_INGEST_TOKEN:' 'Collector ingest secret wiring'
@@ -92,8 +102,19 @@ Reject-Text $indexer 'llm-council-otel-ingest' 'unsupported indexer OTLP ingress
 Reject-Text $indexer 'OTEL_EXPORTER_OTLP_' 'unsupported indexer telemetry export'
 
 Require-Text $option 'OTEL_EXPORTER_OTLP_ENDPOINT_GRPC=otel-collector:4317' 'Collector-only GraphRAG endpoint'
+Require-Text $option 'OTEL_EXPORTER_OTLP_ENDPOINT_ORCHESTRATOR=http://otel-collector:4317' 'Collector-only Orchestrator endpoint'
+Require-Text $option 'OTEL_EXPORTER_OTLP_PROTOCOL_ORCHESTRATOR=grpc' 'Orchestrator gRPC exporter protocol'
 Reject-Text $option 'zipkin:' 'direct Zipkin GraphRAG endpoint'
 Reject-Text $option 'openlit' 'direct OpenLIT GraphRAG endpoint'
+Require-Text $composeFiles 'projects/core/overlays/collector-canary.yml' 'opt-in Orchestrator Collector overlay'
+Require-Text $coreOverlay 'llm-council-otel-ingest' 'private Orchestrator Collector network'
+Require-Text $coreOverlay 'OTEL_SERVICE_NAME: orchestrator-service' 'Orchestrator C3 service identity'
+Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_PROTOCOL' 'Orchestrator OTLP protocol override'
+Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_ENDPOINT' 'Orchestrator Collector endpoint override'
+Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_HEADERS' 'Orchestrator Collector bearer header'
+Reject-Text $coreOverlay 'zipkin:' 'direct Zipkin Orchestrator endpoint'
+Reject-Text $coreOverlay 'openlit' 'direct OpenLIT Orchestrator endpoint'
+Reject-Text $coreOverlay 'ports:' 'published Orchestrator Collector overlay ports'
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "BP1.75 Collector check failed: docker is required to validate the exact Collector configuration"

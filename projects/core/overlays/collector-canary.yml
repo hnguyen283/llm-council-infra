@@ -1,0 +1,15 @@
+# BP1.75 C3 opt-in overlay. It routes only the Orchestrator GraphRAG client
+# through the private Collector ingress; the normal core profile remains
+# unchanged and all other Java exporters retain their existing configuration.
+networks:
+  llm-council-otel-ingest: { external: true }
+
+services:
+  orchestrator-service:
+    networks:
+      llm-council-otel-ingest: {}
+    environment:
+      OTEL_SERVICE_NAME: orchestrator-service
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL_ORCHESTRATOR:-grpc}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_ORCHESTRATOR:-http://otel-collector:4317}
+      OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"

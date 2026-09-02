@@ -91,7 +91,7 @@ function New-TracePayload {
                             @{
                                 traceId = "0123456789abcdef0123456789abcdef"
                                 spanId = "0123456789abcdef"
-                                name = "RetrievalPipeline"
+                                name = $SpanName
                                 kind = 1
                                 startTimeUnixNano = $nowNanos
                                 endTimeUnixNano = $nowNanos
@@ -169,6 +169,7 @@ try {
     Invoke-Docker @("exec", $proofClientId, "wget", "-qO", "/dev/null", "http://otel-collector:13133/") "Collector health endpoint did not respond from inside the private Docker network."
 
     Send-OtlpJson (New-TracePayload "graphrag-retrieval-service" "bp175-allowed-trace" "") "allowed-trace"
+    Send-OtlpJson (New-TracePayload "orchestrator-service" "bp175-orchestrator-trace" "" "" "GraphRagClient.executeLocalSearch") "orchestrator-trace"
     Send-OtlpJson (New-TracePayload "graphrag-retrieval-service" "bp175-registry-trace" "" "unregistered.field") "unregistered-trace"
     Send-OtlpJson (New-TracePayload "graphrag-retrieval-service" "bp175-prohibited-trace" "rag.query") "prohibited-trace"
     Send-OtlpJson (New-TracePayload "untrusted-bp175-service" "bp175-untrusted-trace" "") "untrusted-trace"
@@ -195,6 +196,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Collector proof failed: could not retrieve the disposable debug test sink." }
     Assert-Contains $collectorLog "bp175-allowed-trace" "allowed trace"
     Assert-Contains $collectorLog "bp175-registry-trace" "registered attribute trace"
+    Assert-Contains $collectorLog "bp175-orchestrator-trace" "Orchestrator C3 allowlisted trace"
     Assert-Contains $collectorLog "llm_council.telemetry_gateway" "trusted gateway stamp"
     Assert-Contains $collectorLog "service.namespace" "trusted namespace stamp"
     Assert-NotContains $collectorLog "bp175-prohibited-trace" "prohibited trace"
