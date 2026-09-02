@@ -1,10 +1,21 @@
-# BP1.75 C3 opt-in overlay. It routes only the Orchestrator GraphRAG client
-# through the private Collector ingress; the normal core profile remains
-# unchanged and all other Java exporters retain their existing configuration.
+# BP1.75 C3 opt-in overlay. C3.2A adds only the API Gateway HTTP exporter
+# to the existing Orchestrator GraphRAG canary. The normal core profile remains
+# unchanged and the provider-worker exporters retain their existing routes.
 networks:
   llm-council-otel-ingest: { external: true }
 
 services:
+  api-gateway:
+    networks:
+      llm-council-otel-ingest: {}
+    environment:
+      OTEL_SERVICE_NAME: api-gateway
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL_API_GATEWAY:-http/protobuf}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_API_GATEWAY:-http://otel-collector:4318}
+      OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OTLP_TRACING_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+
   orchestrator-service:
     networks:
       llm-council-otel-ingest: {}
