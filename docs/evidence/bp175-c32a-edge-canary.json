@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "llm-council.bp175-c32a-edge-canary-evidence/v1",
+  "recordedAtUtc": "2026-09-02T11:42:43.2914192Z",
+  "approvalPacket": "reports/architecture-roadmap/2026-09-02/01/approval-request.md",
+  "pipelineContractVersion": "llm-council.ci-contract/v1",
+  "environmentProfile": "prod-full-local-observability-collector-canary",
+  "testedSource": {
+    "backendSha": "551aef1f9fd689a4553f9edfc8bff636566da192",
+    "infrastructureSha": "cee02075726feda2d4d2a2b9dcda888936323b02"
+  },
+  "testedImage": {
+    "name": "local/llm-council/api-gateway:bp175-c32a-551aef1",
+    "digest": "sha256:ad4b516597ffaaa06f1b570ed30794af3402face0d76cb79e2136cfaeed44223"
+  },
+  "telemetryContract": {
+    "schemaVersion": "llm-council.standard-sdk-http-telemetry/v1",
+    "serviceName": "api-gateway",
+    "spanName": "http get /actuator/health",
+    "spanKind": "SPAN_KIND_SERVER",
+    "retainedSpanAttributes": [
+      "method",
+      "outcome",
+      "status",
+      "uri"
+    ],
+    "manualRegistryUnchanged": true
+  },
+  "validation": {
+    "focusedMaven": "passed: common 56 tests; api-gateway 31 tests; zero failures/errors",
+    "collectorStaticPolicy": "passed: cross-repository registry/policy parity and exact pinned sustained/proof config validation",
+    "priorC3Regression": "passed: authenticated C3.1 service/span policy, bounded backend outage, recovery, and cleanup",
+    "composeRender": "passed: all portable options including the opt-in canary",
+    "portableCiContract": "passed: validate, test, collector_canary, security, package, evidence",
+    "isolatedP0RuntimeProof": "passed",
+    "targetedOptionUpAndRollback": "passed",
+    "defaultProductionFilesTouched": false,
+    "defaultProdCmdRequired": false
+  },
+  "runtime": {
+    "sampleCount": 25,
+    "pressureSubmissions": 160,
+    "baselineP95Ms": 357.3,
+    "canaryP95Ms": 440.4,
+    "canaryP95LimitMs": 535.95,
+    "collectorOutageP95Ms": 483.0,
+    "collectorOutageP95LimitMs": 714.6,
+    "rollbackP95Ms": 420.1,
+    "productSuccessRate": "100%",
+    "traceParentContinuityVerified": true,
+    "privacyNegativeCanaries": "passed: prohibited records dropped and unknown/raw URL values stripped",
+    "boundedQueueSignals": "passed: accepted, filtered, queue-full, retry, failed/drop, and recovery",
+    "collectorOutageProductPath": "passed",
+    "collectorRecovery": "passed"
+  },
+  "operatorEntrypoint": {
+    "exactImageTargetedComposeUp": "passed",
+    "apiGatewayHealth": "healthy",
+    "collectorRunning": true,
+    "privateIngressVerified": true,
+    "publishedEdgeHealth": "UP after portal-edge DNS refresh",
+    "rollbackDefaultEndpoint": "http://zipkin:9411",
+    "rollbackPrivateIngressRemoved": true,
+    "temporaryCollectorRemoved": true
+  },
+  "cleanup": {
+    "exactNamedProofContainersAbsent": true,
+    "proofBackendNetworkAbsent": true,
+    "generatedCredentialsAbsent": true,
+    "temporaryEvidenceSinksAbsent": true
+  },
+  "artifacts": {
+    "portableCiManifestSha256": "8deae493e5788a526b6253db5da38ce849a627829c11dcb8ce22f521846d2777",
+    "runtimeProofScriptSha256": "d926b09c8c773f071b40fc04321efd3b9a912429bd78b257b3de07db0495d9b5"
+  },
+  "residualGates": [
+    "Gemini, GPT, and Local AI provider-worker migration remains C3.2B and is not authorized by this evidence",
+    "Default-route cutover remains C3.2C and is not authorized by this evidence",
+    "No production rollout, observation-window acceptance, PR merge, branch-setting change, OpenLIT, ClickHouse, Promptfoo, BP2, or BP3 work is authorized"
+  ]
+}
