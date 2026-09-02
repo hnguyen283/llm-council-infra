@@ -1,7 +1,7 @@
 # BP1.75 sustained Collector canary policy gateway.
 #
 # This config is content-free by construction. It accepts authenticated traces
-# only from the retrieval service, the Orchestrator GraphRAG client, and the API Gateway edge canary, retains only fields listed in the registry,
+# only from the retrieval service, the Orchestrator GraphRAG client, the API Gateway edge canary, and the three provider-worker Kafka canaries, retains only fields listed in the registries,
 # and has no debug exporter. The separate collector-proof.yaml is the sole
 # disposable diagnostic sink used by the runtime proof.
 
@@ -40,7 +40,7 @@ processors:
     error_mode: ignore
     traces:
       span:
-        - resource.attributes["service.name"] != "graphrag-retrieval-service" and resource.attributes["service.name"] != "orchestrator-service" and resource.attributes["service.name"] != "api-gateway"
+        - resource.attributes["service.name"] != "graphrag-retrieval-service" and resource.attributes["service.name"] != "orchestrator-service" and resource.attributes["service.name"] != "api-gateway" and resource.attributes["service.name"] != "gemini-service" and resource.attributes["service.name"] != "gpt-service" and resource.attributes["service.name"] != "local-ai-service"
 
   # Span names and structures are part of the content-free contract. Events
   # may carry arbitrary attributes or bodies, so the canary does not admit them.
@@ -48,12 +48,54 @@ processors:
     error_mode: ignore
     traces:
       span:
-        - name != "RetrievalPipeline" and name != "VectorSearch" and name != "GraphTraversal" and name != "GraphRagClient.executeLocalSearch" and name != "GraphRagClient.executeGlobalSearch" and name != "http get /actuator/health"
+        - name != "RetrievalPipeline" and name != "VectorSearch" and name != "GraphTraversal" and name != "GraphRagClient.executeLocalSearch" and name != "GraphRagClient.executeGlobalSearch" and name != "http get /actuator/health" and name != "gemini.search.requests process" and name != "gemini.search.replies send" and name != "gemini.search.requests.dlq send" and name != "gpt.analyze.requests process" and name != "gpt.analyze.replies send" and name != "gpt.analyze.requests.dlq send" and name != "local-ai.requests process" and name != "local-ai.replies send" and name != "local-ai.requests.dlq send"
         - resource.attributes["service.name"] == "api-gateway" and kind != SPAN_KIND_SERVER
         - resource.attributes["service.name"] == "api-gateway" and attributes["method"] != "GET"
         - resource.attributes["service.name"] == "api-gateway" and attributes["outcome"] != "SUCCESS"
         - resource.attributes["service.name"] == "api-gateway" and attributes["status"] != "200"
         - resource.attributes["service.name"] == "api-gateway" and attributes["uri"] != "/actuator/health"
+        - resource.attributes["service.name"] == "gemini-service" and name != "gemini.search.requests process" and name != "gemini.search.replies send" and name != "gemini.search.requests.dlq send"
+        - resource.attributes["service.name"] == "gpt-service" and name != "gpt.analyze.requests process" and name != "gpt.analyze.replies send" and name != "gpt.analyze.requests.dlq send"
+        - resource.attributes["service.name"] == "local-ai-service" and name != "local-ai.requests process" and name != "local-ai.replies send" and name != "local-ai.requests.dlq send"
+        - resource.attributes["service.name"] == "gemini-service" and attributes["messaging.system"] != "kafka"
+        - resource.attributes["service.name"] == "gpt-service" and attributes["messaging.system"] != "kafka"
+        - resource.attributes["service.name"] == "local-ai-service" and attributes["messaging.system"] != "kafka"
+        - name == "gemini.search.requests process" and kind != SPAN_KIND_CONSUMER
+        - name == "gemini.search.requests process" and attributes["messaging.operation"] != "process"
+        - name == "gemini.search.requests process" and attributes["messaging.source.kind"] != "topic"
+        - name == "gemini.search.requests process" and attributes["messaging.source.name"] != "gemini.search.requests"
+        - name == "gpt.analyze.requests process" and kind != SPAN_KIND_CONSUMER
+        - name == "gpt.analyze.requests process" and attributes["messaging.operation"] != "process"
+        - name == "gpt.analyze.requests process" and attributes["messaging.source.kind"] != "topic"
+        - name == "gpt.analyze.requests process" and attributes["messaging.source.name"] != "gpt.analyze.requests"
+        - name == "local-ai.requests process" and kind != SPAN_KIND_CONSUMER
+        - name == "local-ai.requests process" and attributes["messaging.operation"] != "process"
+        - name == "local-ai.requests process" and attributes["messaging.source.kind"] != "topic"
+        - name == "local-ai.requests process" and attributes["messaging.source.name"] != "local-ai.requests"
+        - name == "gemini.search.replies send" and kind != SPAN_KIND_PRODUCER
+        - name == "gemini.search.replies send" and attributes["messaging.operation"] != "publish"
+        - name == "gemini.search.replies send" and attributes["messaging.destination.kind"] != "topic"
+        - name == "gemini.search.replies send" and attributes["messaging.destination.name"] != "gemini.search.replies"
+        - name == "gemini.search.requests.dlq send" and kind != SPAN_KIND_PRODUCER
+        - name == "gemini.search.requests.dlq send" and attributes["messaging.operation"] != "publish"
+        - name == "gemini.search.requests.dlq send" and attributes["messaging.destination.kind"] != "topic"
+        - name == "gemini.search.requests.dlq send" and attributes["messaging.destination.name"] != "gemini.search.requests.dlq"
+        - name == "gpt.analyze.replies send" and kind != SPAN_KIND_PRODUCER
+        - name == "gpt.analyze.replies send" and attributes["messaging.operation"] != "publish"
+        - name == "gpt.analyze.replies send" and attributes["messaging.destination.kind"] != "topic"
+        - name == "gpt.analyze.replies send" and attributes["messaging.destination.name"] != "gpt.analyze.replies"
+        - name == "gpt.analyze.requests.dlq send" and kind != SPAN_KIND_PRODUCER
+        - name == "gpt.analyze.requests.dlq send" and attributes["messaging.operation"] != "publish"
+        - name == "gpt.analyze.requests.dlq send" and attributes["messaging.destination.kind"] != "topic"
+        - name == "gpt.analyze.requests.dlq send" and attributes["messaging.destination.name"] != "gpt.analyze.requests.dlq"
+        - name == "local-ai.replies send" and kind != SPAN_KIND_PRODUCER
+        - name == "local-ai.replies send" and attributes["messaging.operation"] != "publish"
+        - name == "local-ai.replies send" and attributes["messaging.destination.kind"] != "topic"
+        - name == "local-ai.replies send" and attributes["messaging.destination.name"] != "local-ai.replies"
+        - name == "local-ai.requests.dlq send" and kind != SPAN_KIND_PRODUCER
+        - name == "local-ai.requests.dlq send" and attributes["messaging.operation"] != "publish"
+        - name == "local-ai.requests.dlq send" and attributes["messaging.destination.kind"] != "topic"
+        - name == "local-ai.requests.dlq send" and attributes["messaging.destination.name"] != "local-ai.requests.dlq"
         - Len(events) > 0
         - Len(links) > 0
 
@@ -77,6 +119,9 @@ processors:
         - attributes["http.request.body"] != nil
         - attributes["http.response.body"] != nil
         - attributes["body"] != nil
+        - attributes["messaging.kafka.message.key"] != nil
+        - attributes["messaging.message.body"] != nil
+        - attributes["messaging.message.payload"] != nil
 
   # Keep only the enumerated observability values. Pseudonymous tenant and
   # correlation labels are deliberately not forwarded. The test marker is a
@@ -89,8 +134,12 @@ processors:
           - keep_keys(attributes, ["service.name", "service.version"])
       - context: span
         statements:
-          - keep_keys(attributes, ["rag.query_length", "rag.operation", "rag.fallback_mode", "rag.context_precision", "rag.hit_miss_ratio", "rag.confidence_score", "rag.vector_hits_count", "rag.max_similarity", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] != "api-gateway"
+          - keep_keys(attributes, ["rag.query_length", "rag.operation", "rag.fallback_mode", "rag.context_precision", "rag.hit_miss_ratio", "rag.confidence_score", "rag.vector_hits_count", "rag.max_similarity", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] == "graphrag-retrieval-service"
+          - keep_keys(attributes, ["rag.query_length", "rag.operation", "rag.fallback_mode", "rag.context_precision", "rag.hit_miss_ratio", "rag.confidence_score", "rag.vector_hits_count", "rag.max_similarity", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] == "orchestrator-service"
           - keep_keys(attributes, ["method", "outcome", "status", "uri", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] == "api-gateway"
+          - keep_keys(attributes, ["messaging.system", "messaging.operation", "messaging.source.kind", "messaging.source.name", "messaging.destination.kind", "messaging.destination.name", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] == "gemini-service"
+          - keep_keys(attributes, ["messaging.system", "messaging.operation", "messaging.source.kind", "messaging.source.name", "messaging.destination.kind", "messaging.destination.name", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] == "gpt-service"
+          - keep_keys(attributes, ["messaging.system", "messaging.operation", "messaging.source.kind", "messaging.source.name", "messaging.destination.kind", "messaging.destination.name", "llm_council.telemetry.test_marker"]) where resource.attributes["service.name"] == "local-ai-service"
 
   resource/trusted-stamp:
     attributes:
@@ -105,7 +154,7 @@ processors:
         value: otel-collector
       - key: llm_council.telemetry_policy
         action: upsert
-        value: bp175-canary-v3
+        value: bp175-canary-v4
 
   probabilistic_sampler/canary:
     sampling_percentage: 100

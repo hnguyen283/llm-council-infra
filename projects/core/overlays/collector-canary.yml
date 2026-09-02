@@ -1,6 +1,6 @@
-# BP1.75 C3 opt-in overlay. C3.2A adds only the API Gateway HTTP exporter
-# to the existing Orchestrator GraphRAG canary. The normal core profile remains
-# unchanged and the provider-worker exporters retain their existing routes.
+# BP1.75 C3 opt-in overlay. C3.2B extends the API Gateway and Orchestrator
+# canary with Gemini, GPT, and Local AI Kafka exporters. The normal core
+# profile and shared Zipkin defaults remain unchanged.
 networks:
   llm-council-otel-ingest: { external: true }
 
@@ -24,3 +24,36 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL_ORCHESTRATOR:-grpc}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_ORCHESTRATOR:-http://otel-collector:4317}
       OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+
+  gemini-service:
+    networks:
+      llm-council-otel-ingest: {}
+    environment:
+      OTEL_SERVICE_NAME: gemini-service
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL_GEMINI:-http/protobuf}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GEMINI:-http://otel-collector:4318}
+      OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OTLP_TRACING_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+
+  gpt-service:
+    networks:
+      llm-council-otel-ingest: {}
+    environment:
+      OTEL_SERVICE_NAME: gpt-service
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL_GPT:-http/protobuf}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_GPT:-http://otel-collector:4318}
+      OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OTLP_TRACING_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+
+  local-ai-service:
+    networks:
+      llm-council-otel-ingest: {}
+    environment:
+      OTEL_SERVICE_NAME: local-ai-service
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL_LOCAL_AI:-http/protobuf}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT_LOCAL_AI:-http://otel-collector:4318}
+      OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
+      MANAGEMENT_OTLP_TRACING_HEADERS_AUTHORIZATION: "Bearer ${OTEL_COLLECTOR_INGEST_TOKEN:?OTEL_COLLECTOR_INGEST_TOKEN is required for the Collector canary}"
