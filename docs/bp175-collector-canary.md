@@ -2,17 +2,15 @@
 
 ## Scope and safety boundary
 
-`prod-full-local-observability-collector-canary` is a local GraphRAG plus
-single-Orchestrator proof profile. `graphrag-retrieval-service` and the
-Orchestrator GraphRAG client are the only workloads on the private
-`llm-council-otel-ingest` network. The indexing worker is intentionally outside
-this path: it does not yet emit a qualified semantic trace, so it must not be
-presented as migrated.
+`prod-full-local-observability-collector-canary` is the opt-in local profile
+for the qualified GraphRAG/Orchestrator path, the C3.2A API Gateway edge, and
+the C3.2B Gemini, GPT, and Local AI provider workers. The indexing worker is
+outside this path because it does not yet emit a qualified semantic trace.
 
 The Collector is the only service connected to both private ingress and the
 observability backend network. It publishes no OTLP, health, or self-metric
-port to the host. Ingestion uses a required bearer token; supply it through the
-shell or the option's untracked `.env`, never `option.env` or a committed file:
+port to the host. Ingestion requires a bearer token supplied through the shell
+or the option's untracked `.env`, never `option.env` or a committed file:
 
 ```powershell
 $env:OTEL_COLLECTOR_INGEST_TOKEN = [guid]::NewGuid().ToString('N')
@@ -29,72 +27,76 @@ $env:OTEL_COLLECTOR_INGEST_TOKEN = [guid]::NewGuid().ToString('N')
 | Upstream revision | `145e73e8663aff5ce978ea38cf0cbd4a97017141` |
 | OCI license label | `Apache-2.0` |
 
-The exact image is configuration-validated by
-`scripts\check-bp175-collector-canary.ps1`; CI runs the same exact-image
-validation for both the sustained and disposable proof configurations.
+`scripts\check-bp175-collector-canary.ps1` validates the exact image and both
+sustained and disposable proof configurations. CI runs the same validation.
 
-## Policy registry
+## Policy registries
 
-The sustained configuration accepts only authenticated traces with:
+The Collector keeps three contracts separate:
 
-- service name `graphrag-retrieval-service` or `orchestrator-service`;
-- GraphRAG span name `RetrievalPipeline`, `VectorSearch`, or `GraphTraversal`,
-  or Orchestrator span name `GraphRagClient.executeLocalSearch` or
-  `GraphRagClient.executeGlobalSearch`;
-- no events; and
-- the explicit span-field registry: `rag.query_length`, `rag.operation`, `rag.fallback_mode`,
-  `rag.context_precision`, `rag.hit_miss_ratio`, `rag.confidence_score`,
-  `rag.vector_hits_count`, and `rag.max_similarity`.
+- manually created GraphRAG and Orchestrator spans use
+  `observation-envelope-v1.yaml`;
+- API Gateway's standard HTTP server span uses
+  `standard-sdk-http-telemetry-v1.yaml`; and
+- provider-worker standard Kafka spans use
+  `standard-sdk-kafka-telemetry-v1.yaml`.
 
-The Collector removes all other resource and span attributes. It rejects the
-whole trace before that registry stage if a prohibited raw-content, tenant,
-document, entity, prompt, completion, input/output, authorization, or cookie
-attribute is present. Only after those checks does it add the trusted namespace,
-environment, gateway, and policy stamps.
+For C3.2B, only `gemini-service`, `gpt-service`, and `local-ai-service`
+are admitted. Each service must match its exact request `process`, reply
+`send`, or request-DLQ `send` span, its Consumer or Producer kind, its
+operation, and its request/reply/DLQ topic. Retained span attributes are limited
+to:
 
-The sustained `collector-canary.yaml` contains no debug exporter. It exports
-sanitized telemetry only to the internal Zipkin comparison endpoint through a
-bounded queue/retry policy stored on tmpfs. `collector-proof.yaml` is separate
-and adds the debug exporter only for a disposable runtime test. This prevents
-ordinary canary operation from persisting diagnostic payloads in container logs.
+- `messaging.system`;
+- `messaging.operation`;
+- `messaging.source.kind` and `messaging.source.name`; or
+- `messaging.destination.kind` and `messaging.destination.name`.
 
-Collector self-metrics are exposed only as `otel-collector:8888` on the private
-ingress network. The proof checks accepted-span and queue metric families from
-its temporary in-network client; no host port is exposed.
+Message keys and payloads, prompt/query/model content, client IDs, consumer
+groups, offsets, partitions, peer fields, Spring listener/template identifiers,
+unknown fields, events, and links are discarded or cause whole-span rejection
+according to the registry. The manual and HTTP registries are not widened.
+
+The sustained `collector-canary.yaml` has no debug exporter. It exports only
+sanitized telemetry to internal Zipkin using a bounded queue and retry policy on
+tmpfs. `collector-proof.yaml` adds a debug sink solely for disposable runtime
+tests. Collector self-metrics remain private at `otel-collector:8888`.
 
 ## Operator proof and rollback
 
-Run the checks before starting the option:
+Run all gates before starting the option:
 
-```bat
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\check-bp175-collector-canary.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\bp175-collector-canary-proof.ps1
+```powershell
+pwsh -File scripts/check-bp175-collector-canary.ps1
+pwsh -File scripts/bp175-collector-canary-proof.ps1
+pwsh -File scripts/bp175-c32a-edge-canary-proof.ps1 -ApiGatewayImage local/llm-council/api-gateway:<tested-sha>
+pwsh -File scripts/bp175-c32b-worker-canary-proof.ps1 `
+  -GeminiImage local/llm-council/gemini-service:<tested-sha> `
+  -GptImage local/llm-council/gpt-service:<tested-sha> `
+  -LocalAiImage local/llm-council/local-ai-service:<tested-sha>
 ```
 
-The runtime proof creates only the named local `bp175-collector-proof` Compose
-project and temporary payloads. It cold-starts the Collector without Zipkin,
-then checks authenticated allowlisted traffic, unauthenticated forged traffic,
-prohibited fields, untrusted services, unknown attribute stripping, self-metric
-availability, bounded comparison-backend outage pressure, and recovery after
-Zipkin restarts. Cleanup removes that named proof project and its temporary
-files.
+The C3.2B proof temporarily stops the three source worker containers and uses
+clones with all external-provider credentials/endpoints blank. It submits
+synthetic Kafka requests, exercises success and malformed/DLQ paths, checks
+cross-thread parent continuity and privacy filtering, measures product latency,
+applies bounded-backend and Collector outage pressure, verifies recovery, then
+runs telemetry-disabled rollback clones. Its `finally` cleanup restores the
+source workers and removes exact named proof resources.
 
-Start the sustained opt-in profile only after a passing proof:
+Start the sustained opt-in profile only after passing evidence:
 
 ```bat
 scripts\start.bat prod-full-local-observability-collector-canary
 ```
 
-Rollback is independent of the product path: stop this profile and return to
-`prod-full-local-observability`. GraphRAG export is blank outside the canary
-option. Do not redirect workloads directly to Zipkin, OpenLIT, or ClickHouse.
+Rollback by stopping this profile and returning to
+`prod-full-local-observability`. The default Java Zipkin route remains
+unchanged, so no code or persistence migration is needed.
 
 ## Remaining Batch C gates
 
-This is a local Collector-gateway canary. It does not approve OpenLIT/ClickHouse
-artifact intake, operator RBAC, retention/deletion, backup/restore, resource
-headroom, the indexing worker, full workload migration beyond the named
-Orchestrator client, or production rollout. OpenLIT remains rejected by the
-existing
-high/critical vulnerability gate until a vendor-remediated image passes the
-same qualification.
+C3.2B does not authorize C3.2C default-route or production-topology cutover.
+It also does not approve OpenLIT/ClickHouse intake, operator RBAC,
+retention/deletion, backup/restore, resource headroom changes, indexing-worker
+migration, production rollout, or later BP2/BP3 work.

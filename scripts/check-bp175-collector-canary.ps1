@@ -73,10 +73,11 @@ $coreOverlayPath = Join-Path $infraRoot "projects\core\overlays\collector-canary
 $optionPath = Join-Path $infraRoot "options\prod-full-local-observability-collector-canary\option.env"
 $composeFilesPath = Join-Path $infraRoot "options\prod-full-local-observability-collector-canary\compose.files"
 $manualRegistryPath = Join-Path $backendRoot "docs\architecture\observation-envelope-v1.yaml"
-$sdkRegistryPath = Join-Path $backendRoot "docs\architecture\standard-sdk-http-telemetry-v1.yaml"
+$httpRegistryPath = Join-Path $backendRoot "docs\architecture\standard-sdk-http-telemetry-v1.yaml"
+$kafkaRegistryPath = Join-Path $backendRoot "docs\architecture\standard-sdk-kafka-telemetry-v1.yaml"
 $backendDockerConfigPath = Join-Path $backendRoot "config-repo\application-docker.yml"
 
-foreach ($requiredPath in @($actualConfigPath, $proofConfigPath, $composePath, $graphPath, $coreOverlayPath, $optionPath, $composeFilesPath, $manualRegistryPath, $sdkRegistryPath, $backendDockerConfigPath)) {
+foreach ($requiredPath in @($actualConfigPath, $proofConfigPath, $composePath, $graphPath, $coreOverlayPath, $optionPath, $composeFilesPath, $manualRegistryPath, $httpRegistryPath, $kafkaRegistryPath, $backendDockerConfigPath)) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "BP1.75 Collector check failed: required path is missing: $requiredPath"
     }
@@ -90,30 +91,46 @@ $coreOverlay = Get-Content -LiteralPath $coreOverlayPath -Raw
 $option = Get-Content -LiteralPath $optionPath -Raw
 $composeFiles = Get-Content -LiteralPath $composeFilesPath -Raw
 $manualRegistry = Get-Content -LiteralPath $manualRegistryPath -Raw
-$sdkRegistry = Get-Content -LiteralPath $sdkRegistryPath -Raw
+$httpRegistry = Get-Content -LiteralPath $httpRegistryPath -Raw
+$kafkaRegistry = Get-Content -LiteralPath $kafkaRegistryPath -Raw
 $backendDockerConfig = Get-Content -LiteralPath $backendDockerConfigPath -Raw
 
 Require-Text $manualRegistry 'schemaVersion: llm-council.observation-envelope/v1' 'unchanged manual registry schema'
 Reject-Text $manualRegistry 'standard-sdk-http-telemetry' 'SDK fields in the manual registry'
-Require-Text $sdkRegistry 'schemaVersion: llm-council.standard-sdk-http-telemetry/v1' 'SDK HTTP registry schema'
-Require-Text $sdkRegistry 'status: bp175-c32a-edge-canary' 'SDK HTTP registry status'
+Require-Text $httpRegistry 'schemaVersion: llm-council.standard-sdk-http-telemetry/v1' 'SDK HTTP registry schema'
+Require-Text $httpRegistry 'status: bp175-c32a-edge-canary' 'SDK HTTP registry status'
+Require-Text $kafkaRegistry 'schemaVersion: llm-council.standard-sdk-kafka-telemetry/v1' 'SDK Kafka registry schema'
+Require-Text $kafkaRegistry 'status: bp175-c32b-provider-worker-canary' 'SDK Kafka registry status'
 
-$sdkServices = Get-TopLevelYamlList $sdkRegistry 'allowedServiceNames'
-$sdkSpanNames = Get-TopLevelYamlList $sdkRegistry 'allowedSpanNames'
-$sdkSpanKinds = Get-TopLevelYamlList $sdkRegistry 'allowedSpanKinds'
-$sdkResourceAttributes = Get-TopLevelYamlList $sdkRegistry 'allowedResourceAttributeNames'
-$sdkSpanAttributes = Get-RegistryAttributeKeys $sdkRegistry
-$sdkProofAttributes = Get-TopLevelYamlList $sdkRegistry 'proofOnlyAttributeNames'
-$sdkProhibitedAttributes = Get-TopLevelYamlList $sdkRegistry 'prohibitedAttributeNames'
-Assert-SetEqual $sdkServices @('api-gateway') 'SDK service registry'
-Assert-SetEqual $sdkSpanNames @('http get /actuator/health') 'SDK span-name registry'
-Assert-SetEqual $sdkSpanKinds @('SPAN_KIND_SERVER') 'SDK span-kind registry'
-Assert-SetEqual $sdkResourceAttributes @('service.name', 'service.version') 'SDK resource registry'
-Assert-SetEqual $sdkSpanAttributes @('method', 'outcome', 'status', 'uri') 'SDK span-attribute registry'
-Assert-SetEqual $sdkProofAttributes @('llm_council.telemetry.test_marker') 'SDK proof-only registry'
+$httpServices = Get-TopLevelYamlList $httpRegistry 'allowedServiceNames'
+$httpSpanNames = Get-TopLevelYamlList $httpRegistry 'allowedSpanNames'
+$httpSpanKinds = Get-TopLevelYamlList $httpRegistry 'allowedSpanKinds'
+$httpResourceAttributes = Get-TopLevelYamlList $httpRegistry 'allowedResourceAttributeNames'
+$httpSpanAttributes = Get-RegistryAttributeKeys $httpRegistry
+$httpProofAttributes = Get-TopLevelYamlList $httpRegistry 'proofOnlyAttributeNames'
+$httpProhibitedAttributes = Get-TopLevelYamlList $httpRegistry 'prohibitedAttributeNames'
+$kafkaServices = Get-TopLevelYamlList $kafkaRegistry 'allowedServiceNames'
+$kafkaSpanNames = Get-TopLevelYamlList $kafkaRegistry 'allowedSpanNames'
+$kafkaSpanKinds = Get-TopLevelYamlList $kafkaRegistry 'allowedSpanKinds'
+$kafkaResourceAttributes = Get-TopLevelYamlList $kafkaRegistry 'allowedResourceAttributeNames'
+$kafkaSpanAttributes = Get-RegistryAttributeKeys $kafkaRegistry
+$kafkaProofAttributes = Get-TopLevelYamlList $kafkaRegistry 'proofOnlyAttributeNames'
+$kafkaProhibitedAttributes = Get-TopLevelYamlList $kafkaRegistry 'prohibitedAttributeNames'
+Assert-SetEqual $httpServices @('api-gateway') 'SDK service registry'
+Assert-SetEqual $httpSpanNames @('http get /actuator/health') 'SDK span-name registry'
+Assert-SetEqual $httpSpanKinds @('SPAN_KIND_SERVER') 'SDK span-kind registry'
+Assert-SetEqual $httpResourceAttributes @('service.name', 'service.version') 'SDK resource registry'
+Assert-SetEqual $httpSpanAttributes @('method', 'outcome', 'status', 'uri') 'SDK span-attribute registry'
+Assert-SetEqual $httpProofAttributes @('llm_council.telemetry.test_marker') 'SDK proof-only registry'
+Assert-SetEqual $kafkaServices @('gemini-service', 'gpt-service', 'local-ai-service') 'SDK Kafka service registry'
+Assert-SetEqual $kafkaSpanNames @('gemini.search.requests process', 'gemini.search.replies send', 'gemini.search.requests.dlq send', 'gpt.analyze.requests process', 'gpt.analyze.replies send', 'gpt.analyze.requests.dlq send', 'local-ai.requests process', 'local-ai.replies send', 'local-ai.requests.dlq send') 'SDK Kafka span-name registry'
+Assert-SetEqual $kafkaSpanKinds @('SPAN_KIND_CONSUMER', 'SPAN_KIND_PRODUCER') 'SDK Kafka span-kind registry'
+Assert-SetEqual $kafkaResourceAttributes @('service.name', 'service.version') 'SDK Kafka resource registry'
+Assert-SetEqual $kafkaSpanAttributes @('messaging.system', 'messaging.operation', 'messaging.source.kind', 'messaging.source.name', 'messaging.destination.kind', 'messaging.destination.name') 'SDK Kafka span-attribute registry'
+Assert-SetEqual $kafkaProofAttributes @('llm_council.telemetry.test_marker') 'SDK Kafka proof-only registry'
 
-$expectedServices = @('graphrag-retrieval-service', 'orchestrator-service') + $sdkServices
-$expectedSpans = @('RetrievalPipeline', 'VectorSearch', 'GraphTraversal', 'GraphRagClient.executeLocalSearch', 'GraphRagClient.executeGlobalSearch') + $sdkSpanNames
+$expectedServices = @('graphrag-retrieval-service', 'orchestrator-service') + $httpServices + $kafkaServices
+$expectedSpans = @('RetrievalPipeline', 'VectorSearch', 'GraphTraversal', 'GraphRagClient.executeLocalSearch', 'GraphRagClient.executeGlobalSearch') + $httpSpanNames + $kafkaSpanNames
 foreach ($collectorConfig in @($actual, $proof)) {
     foreach ($required in @(
         'endpoint: 0.0.0.0:4317',
@@ -132,7 +149,7 @@ foreach ($collectorConfig in @($actual, $proof)) {
         'retry_on_failure:',
         'Len(events) > 0',
         'Len(links) > 0',
-        'value: bp175-canary-v3'
+        'value: bp175-canary-v4'
     )) { Require-Text $collectorConfig $required 'Collector policy element' }
 
     $serviceLine = [regex]::Match($collectorConfig, '(?m)^\s*- resource\.attributes\["service\.name"\] != .+$').Value
@@ -143,8 +160,9 @@ foreach ($collectorConfig in @($actual, $proof)) {
     $shapeValues = @([regex]::Matches($shapeLine, 'name != "(?<value>[^"]+)"') | ForEach-Object { $_.Groups['value'].Value })
     Assert-SetEqual $shapeValues $expectedSpans 'Collector span-name allow-list'
 
-    foreach ($kind in $sdkSpanKinds) { Require-Text $collectorConfig "kind != $kind" 'SDK span-kind gate' }
-    foreach ($attribute in $sdkProhibitedAttributes) { Require-Text $collectorConfig "attributes[`"$attribute`"] != nil" 'SDK prohibited-attribute gate' }
+    foreach ($kind in $httpSpanKinds) { Require-Text $collectorConfig "kind != $kind" 'SDK span-kind gate' }
+    foreach ($attribute in $httpProhibitedAttributes) { Require-Text $collectorConfig "attributes[`"$attribute`"] != nil" 'SDK prohibited-attribute gate' }
+    foreach ($attribute in $kafkaProhibitedAttributes) { Require-Text $collectorConfig "attributes[`"$attribute`"] != nil" 'SDK Kafka prohibited-attribute gate' }
     foreach ($valueGate in @(
         'attributes["method"] != "GET"',
         'attributes["outcome"] != "SUCCESS"',
@@ -153,12 +171,32 @@ foreach ($collectorConfig in @($actual, $proof)) {
     )) { Require-Text $collectorConfig $valueGate 'closed SDK value gate' }
 
     $resourceKeep = [regex]::Match($collectorConfig, 'keep_keys\(attributes, \[(?<values>[^\]]+)\]\)\s*\r?\n\s*- context: span').Groups['values'].Value
-    Assert-SetEqual (Get-QuotedValues $resourceKeep) $sdkResourceAttributes 'Collector resource registry'
+    Assert-SetEqual (Get-QuotedValues $resourceKeep) $httpResourceAttributes 'Collector resource registry'
     $httpKeep = [regex]::Match($collectorConfig, 'keep_keys\(attributes, \[(?<values>[^\]]+)\]\) where resource\.attributes\["service\.name"\] == "api-gateway"').Groups['values'].Value
     if ([string]::IsNullOrWhiteSpace($httpKeep)) { throw 'BP1.75 Collector check failed: API Gateway attribute transform is missing.' }
-    Assert-SetEqual (Get-QuotedValues $httpKeep) ($sdkSpanAttributes + $sdkProofAttributes) 'Collector SDK attribute registry'
+    Assert-SetEqual (Get-QuotedValues $httpKeep) ($httpSpanAttributes + $httpProofAttributes) 'Collector SDK attribute registry'
     Reject-Text $httpKeep 'http.url' 'raw URL in retained SDK attributes'
     Reject-Text $httpKeep 'exception' 'exception data in retained SDK attributes'
+
+    foreach ($service in $kafkaServices) {
+        $escapedService = [regex]::Escape($service)
+        $kafkaKeep = [regex]::Match($collectorConfig, "keep_keys\(attributes, \[(?<values>[^\]]+)\]\) where resource\.attributes\[`"service\.name`"\] == `"$escapedService`"").Groups['values'].Value
+        if ([string]::IsNullOrWhiteSpace($kafkaKeep)) { throw "BP1.75 Collector check failed: $service Kafka attribute transform is missing." }
+        Assert-SetEqual (Get-QuotedValues $kafkaKeep) ($kafkaSpanAttributes + $kafkaProofAttributes) "$service Kafka attribute registry"
+    }
+    foreach ($requiredKafkaGate in @(
+        'attributes["messaging.system"] != "kafka"',
+        'attributes["messaging.operation"] != "process"',
+        'attributes["messaging.operation"] != "publish"',
+        'attributes["messaging.source.kind"] != "topic"',
+        'attributes["messaging.destination.kind"] != "topic"'
+    )) { Require-Text $collectorConfig $requiredKafkaGate 'closed Kafka value gate' }
+    foreach ($discarded in @('messaging.consumer.id', 'messaging.kafka.client_id', 'messaging.kafka.consumer.group', 'messaging.kafka.message.offset', 'messaging.kafka.source.partition', 'peer.service', 'spring.kafka.listener.id', 'spring.kafka.template.name')) {
+        foreach ($service in $kafkaServices) {
+            $workerKeep = [regex]::Match($collectorConfig, "keep_keys\(attributes, \[(?<values>[^\]]+)\]\) where resource\.attributes\[`"service\.name`"\] == `"$([regex]::Escape($service))`"").Groups['values'].Value
+            Reject-Text $workerKeep $discarded "discarded Kafka attribute $discarded"
+        }
+    }
 }
 
 Reject-Text $actual 'debug/test-sink:' 'debug exporter in the sustained canary'
@@ -185,6 +223,12 @@ Require-Text $option 'OTEL_EXPORTER_OTLP_ENDPOINT_ORCHESTRATOR=http://otel-colle
 Require-Text $option 'OTEL_EXPORTER_OTLP_PROTOCOL_ORCHESTRATOR=grpc' 'Orchestrator gRPC protocol'
 Require-Text $option 'OTEL_EXPORTER_OTLP_ENDPOINT_API_GATEWAY=http://otel-collector:4318' 'API Gateway Collector endpoint'
 Require-Text $option 'OTEL_EXPORTER_OTLP_PROTOCOL_API_GATEWAY=http/protobuf' 'API Gateway OTLP/HTTP protocol'
+Require-Text $option 'OTEL_EXPORTER_OTLP_ENDPOINT_GEMINI=http://otel-collector:4318' 'Gemini Collector endpoint'
+Require-Text $option 'OTEL_EXPORTER_OTLP_PROTOCOL_GEMINI=http/protobuf' 'Gemini OTLP/HTTP protocol'
+Require-Text $option 'OTEL_EXPORTER_OTLP_ENDPOINT_GPT=http://otel-collector:4318' 'GPT Collector endpoint'
+Require-Text $option 'OTEL_EXPORTER_OTLP_PROTOCOL_GPT=http/protobuf' 'GPT OTLP/HTTP protocol'
+Require-Text $option 'OTEL_EXPORTER_OTLP_ENDPOINT_LOCAL_AI=http://otel-collector:4318' 'Local AI Collector endpoint'
+Require-Text $option 'OTEL_EXPORTER_OTLP_PROTOCOL_LOCAL_AI=http/protobuf' 'Local AI OTLP/HTTP protocol'
 Reject-Text $option 'zipkin:' 'direct Zipkin canary endpoint'
 Reject-Text $option 'openlit' 'direct OpenLIT canary endpoint'
 Reject-Text $option 'clickhouse' 'direct ClickHouse canary endpoint'
@@ -197,18 +241,24 @@ Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_ENDPOINT_API_GATEWAY' 'API Gateway
 Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_PROTOCOL_API_GATEWAY' 'API Gateway protocol override'
 Require-Text $coreOverlay 'MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_HEADERS_AUTHORIZATION' 'Spring Boot 4 OTLP bearer header'
 Require-Text $coreOverlay 'MANAGEMENT_OTLP_TRACING_HEADERS_AUTHORIZATION' 'Spring Boot compatibility OTLP bearer header'
-Reject-Text $coreOverlay '  gemini-service:' 'provider-worker migration in C3.2A overlay'
-Reject-Text $coreOverlay '  gpt-service:' 'provider-worker migration in C3.2A overlay'
-Reject-Text $coreOverlay '  local-ai-service:' 'provider-worker migration in C3.2A overlay'
+Require-Text $coreOverlay '  gemini-service:' 'Gemini worker overlay'
+Require-Text $coreOverlay '  gpt-service:' 'GPT worker overlay'
+Require-Text $coreOverlay '  local-ai-service:' 'Local AI worker overlay'
+Require-Text $coreOverlay 'OTEL_SERVICE_NAME: gemini-service' 'Gemini worker identity'
+Require-Text $coreOverlay 'OTEL_SERVICE_NAME: gpt-service' 'GPT worker identity'
+Require-Text $coreOverlay 'OTEL_SERVICE_NAME: local-ai-service' 'Local AI worker identity'
+Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_ENDPOINT_GEMINI' 'Gemini endpoint override'
+Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_ENDPOINT_GPT' 'GPT endpoint override'
+Require-Text $coreOverlay 'OTEL_EXPORTER_OTLP_ENDPOINT_LOCAL_AI' 'Local AI endpoint override'
 Reject-Text $coreOverlay 'zipkin:' 'direct Zipkin edge endpoint'
 Reject-Text $coreOverlay 'openlit' 'direct OpenLIT edge endpoint'
 Reject-Text $coreOverlay 'clickhouse' 'direct ClickHouse edge endpoint'
 Reject-Text $coreOverlay 'ports:' 'published edge Collector ports'
 
-# C3.2A is opt-in. The shared Docker defaults must remain on their pre-cutover route.
+# C3.2A/C3.2B are opt-in. The shared Docker defaults must remain on their pre-cutover route.
 $defaultZipkin = '${OTEL_EXPORTER_OTLP_ENDPOINT:http://zipkin:9411}/v1/traces'
 if (([regex]::Matches($backendDockerConfig, [regex]::Escape($defaultZipkin))).Count -ne 2) {
-    throw 'BP1.75 Collector check failed: C3.2A changed the default backend OTLP route.'
+    throw 'BP1.75 Collector check failed: C3.2B changed the default backend OTLP route.'
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -221,4 +271,4 @@ foreach ($configPath in @($actualConfigPath, $proofConfigPath)) {
     if ($LASTEXITCODE -ne 0) { throw "BP1.75 Collector check failed: exact pinned image rejected $configPath" }
 }
 
-Write-Host 'BP1.75 Collector canary checks passed: manual/SDK registry separation, C3.1 compatibility, C3.2A parity, opt-in routing, and pinned configs are valid.'
+Write-Host 'BP1.75 Collector canary checks passed: manual/HTTP/Kafka registry separation, C3.1 compatibility, C3.2A/C3.2B parity, opt-in routing, and pinned configs are valid.'
