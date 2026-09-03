@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "llm-council.bp175-c32b-worker-canary-evidence/v1",
+  "recordedAtUtc": "2026-09-03T00:10:49.3350994Z",
+  "approvalPacket": "reports/architecture-roadmap/2026-09-03/01/approval-request.md",
+  "pipelineContractVersion": "llm-council.ci-contract/v1",
+  "environmentProfile": "prod-full-local-observability-collector-canary",
+  "testedSource": {
+    "backendSha": "6317c5da623848f35def4ed7107e875326a78efd",
+    "infrastructureSha": "ff0273490622f7ca631d02edbf0ec133ebbc3846"
+  },
+  "testedImages": [
+    {
+      "service": "gemini-service",
+      "name": "local/llm-council/gemini-service:bp175-c32b-6317c5d",
+      "digest": "sha256:d8d03758d1eeb0340cb426ea4c87d436cccb3fbffcad78bb86907729de43062c"
+    },
+    {
+      "service": "gpt-service",
+      "name": "local/llm-council/gpt-service:bp175-c32b-6317c5d",
+      "digest": "sha256:ec7b9fdad2c2eb7e328da2755eab4d3c4ef08de71370b8d7ff85933004ddf5d1"
+    },
+    {
+      "service": "local-ai-service",
+      "name": "local/llm-council/local-ai-service:bp175-c32b-6317c5d",
+      "digest": "sha256:a51771805ebb40176cfa726ace79806f58c1ad297b98a1c87f4828f7c80f4d82"
+    }
+  ],
+  "telemetryContract": {
+    "schemaVersion": "llm-council.standard-sdk-kafka-telemetry/v1",
+    "serviceNames": [
+      "gemini-service",
+      "gpt-service",
+      "local-ai-service"
+    ],
+    "spanKinds": [
+      "SPAN_KIND_CONSUMER",
+      "SPAN_KIND_PRODUCER"
+    ],
+    "retainedSpanAttributes": [
+      "messaging.system",
+      "messaging.operation",
+      "messaging.source.kind",
+      "messaging.source.name",
+      "messaging.destination.kind",
+      "messaging.destination.name"
+    ],
+    "successAndDlqShapesVerified": true,
+    "producerParentContinuityVerified": true,
+    "manualAndHttpRegistriesUnchanged": true
+  },
+  "validation": {
+    "focusedMaven": "passed: common 56; gemini-service 17; gpt-service 11; local-ai-service 24; zero failures/errors",
+    "collectorStaticPolicy": "passed: manual/HTTP/Kafka registry separation, exact per-worker shape parity, opt-in routing, and pinned sustained/proof configs",
+    "composeRender": "passed: every portable option including the opt-in canary",
+    "portableCiContract": "passed: validate, test, collector_canary, image pin, security, package, evidence",
+    "isolatedP0RuntimeProof": "passed",
+    "defaultProductionFilesTouched": false,
+    "defaultRouteChanged": false
+  },
+  "runtime": {
+    "sampleCount": 5,
+    "pressureSubmissions": 64,
+    "baselineP95Ms": {
+      "gemini-service": 5580.1,
+      "gpt-service": 6408.7,
+      "local-ai-service": 5621.3
+    },
+    "canaryP95Ms": {
+      "gemini-service": 5583.4,
+      "gpt-service": 6017.8,
+      "local-ai-service": 6238.2
+    },
+    "collectorOutageP95Ms": {
+      "gemini-service": 5632.9,
+      "gpt-service": 5549.5,
+      "local-ai-service": 5521.6
+    },
+    "rollbackP95Ms": {
+      "gemini-service": 5591.6,
+      "gpt-service": 5733.3,
+      "local-ai-service": 5385.3
+    },
+    "productSuccessRate": "100%",
+    "successReplyAndDlqPaths": "passed for all three workers",
+    "traceParentContinuity": "passed for all three request/reply paths",
+    "privacyNegativeCanaries": "passed: content/prohibited fields rejected; unknown and high-cardinality Kafka attributes stripped",
+    "boundedBackendSaturation": "passed",
+    "collectorOutageProductPath": "passed",
+    "collectorRecovery": "passed",
+    "telemetryDisabledRollback": "passed"
+  },
+  "safety": {
+    "externalProviderCredentialsBlank": true,
+    "externalProviderEndpointsBlank": true,
+    "sourceWorkersRestoredHealthy": true,
+    "exactNamedProofContainersAbsent": true,
+    "generatedCollectorCredentialAbsent": true,
+    "temporaryEvidenceSinksAbsent": true
+  },
+  "artifacts": {
+    "portableCiContractSha256": "b6636e3d7189ff46f1467991fe36a7ff29cac98d0b2bf4b313ee1d2fdc45587b",
+    "runtimeProofScriptSha256": "1d0f4309bf47c96d436b976c76a23a794ec8d002a6db8fd8c997bd65831450c0"
+  },
+  "residualGates": [
+    "C3.2C default-route and production-topology cutover remains separately gated and is not authorized by this evidence",
+    "No production rollout, PR merge, branch-setting change, OpenLIT, ClickHouse, Promptfoo, BP2, or BP3 work is authorized"
+  ]
+}
